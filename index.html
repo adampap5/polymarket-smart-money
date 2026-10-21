@@ -5,74 +5,118 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Where the top earners agree</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@500;700&family=Source+Sans+3:wght@400;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:wght@400;500;700;800&display=swap" rel="stylesheet">
 <style>
-:root{--bg:#eef1f4;--panel:#fff;--ink:#16202b;--mute:#66727f;--line:#d9dfe5;--yes:#0f7b6c;--no:#c4452d;--other:#4b5fb0;--bar:#dfe5ea}
-@media (prefers-color-scheme:dark){:root{--bg:#10151b;--panel:#18202a;--ink:#e7ecf1;--mute:#93a0ad;--line:#2a3541;--yes:#3cc3ad;--no:#ff7a62;--other:#8c9cf0;--bar:#2a3541}}
+:root{--bg:#eef2ee;--panel:#fff;--ink:#12202e;--mute:#5d6b78;--line:#d6ddd6;--pip:#1f4fd8;--off:#d3dad6;--good:#0b8a5b;--bad:#c23b3b;--hl:#ffe45c;--hlink:#12202e}
+@media (prefers-color-scheme:dark){:root{--bg:#0e1620;--panel:#162230;--ink:#e8eef3;--mute:#93a3b2;--line:#273748;--pip:#6f93ff;--off:#2b3b4b;--good:#3fd09c;--bad:#ff7d7d;--hl:#ffe45c;--hlink:#12202e}}
 *{box-sizing:border-box}
-body{margin:0;background:var(--bg);color:var(--ink);font:400 16px/1.5 "Source Sans 3",system-ui,sans-serif}
-main{max-width:920px;margin:0 auto;padding:32px 20px 64px}
-h1{font:700 clamp(28px,5vw,42px)/1.1 "Bricolage Grotesque",sans-serif;margin:0 0 8px;letter-spacing:-.01em}
-.sub{color:var(--mute);margin:0 0 24px}
-.controls{display:flex;flex-wrap:wrap;gap:20px;align-items:center;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:14px 18px;margin-bottom:20px}
-.controls label{display:flex;gap:10px;align-items:center;font-weight:600}
+body{margin:0;background:var(--bg);color:var(--ink);font:400 16px/1.45 "Schibsted Grotesk",system-ui,sans-serif;font-variant-numeric:tabular-nums}
+main{max-width:980px;margin:0 auto;padding:28px 18px 70px}
+h1{font-weight:800;font-size:clamp(30px,6vw,52px);line-height:1;letter-spacing:-.03em;margin:0 0 8px}
+.sub{color:var(--mute);margin:0 0 22px}
+.tabs{display:flex;gap:6px;margin-bottom:16px}
+.tab,.chip{font:inherit;border:1px solid var(--line);background:var(--panel);color:var(--ink);padding:7px 14px;border-radius:99px;cursor:pointer}
+.tab[aria-selected=true],.chip[aria-pressed=true]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.bar{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px 16px;margin-bottom:16px;display:grid;gap:12px}
+.chips{display:flex;flex-wrap:wrap;gap:6px}.chip{padding:4px 12px;font-size:14px}
+.ctl{display:flex;flex-wrap:wrap;gap:14px 22px;align-items:center}
+.ctl label{display:flex;gap:8px;align-items:center;font-weight:500;font-size:15px}
 select,input[type=text]{font:inherit;padding:6px 8px;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--ink)}
-input[type=range]{accent-color:var(--yes)}
-#minv{min-width:1.5ch;text-align:right}
-.row{background:var(--panel);border:1px solid var(--line);border-radius:10px;margin-bottom:10px}
-.row summary{list-style:none;cursor:pointer;display:grid;grid-template-columns:1fr auto;gap:6px 16px;padding:14px 18px}
+input[type=range]{accent-color:var(--pip)}
+.row{background:var(--panel);border:1px solid var(--line);border-radius:12px;margin-bottom:10px}
+.row summary{list-style:none;cursor:pointer;padding:14px 16px;display:grid;gap:8px}
 .row summary::-webkit-details-marker{display:none}
-.title{font-weight:600}
-.title a{color:inherit;text-decoration:none}.title a:hover{text-decoration:underline}
-.pill{display:inline-block;font-weight:700;font-size:14px;padding:1px 9px;border-radius:99px;margin-right:8px;color:#fff;background:var(--other)}
-.pill.Yes{background:var(--yes)}.pill.No{background:var(--no)}
-.big{font:700 22px "Bricolage Grotesque",sans-serif;text-align:right}
-.meter{grid-column:1/-1;display:flex;align-items:center;gap:12px;color:var(--mute);font-size:14px}
-.bar{flex:1;height:8px;background:var(--bar);border-radius:99px;overflow:hidden;max-width:360px}
-.bar i{display:block;height:100%;background:var(--yes)}
-.detail{border-top:1px solid var(--line);padding:12px 18px;font-size:15px}
-.detail div{display:flex;justify-content:space-between;padding:2px 0}
-.empty{padding:40px;text-align:center;color:var(--mute)}
-:focus-visible{outline:2px solid var(--other);outline-offset:2px}
+.top{display:flex;justify-content:space-between;gap:14px;align-items:baseline}
+.title{font-weight:700}.title a{color:inherit;text-decoration:none}.title a:hover{text-decoration:underline}
+.side{font-weight:800;margin-right:8px;color:var(--good)}.side.No{color:var(--bad)}
+.count{font-weight:800;font-size:24px;white-space:nowrap}.count small{font-weight:500;font-size:14px;color:var(--mute)}
+.pips{display:flex;flex-wrap:wrap;gap:2px}.pips i{width:6px;height:16px;border-radius:2px;background:var(--off)}.pips i.on{background:var(--pip)}
+.meta{display:flex;flex-wrap:wrap;gap:4px 16px;font-size:14px;color:var(--mute)}
+.tag{background:var(--off);padding:0 8px;border-radius:99px;color:var(--ink);font-size:13px}.tag.soon{background:var(--hl);color:var(--hlink);font-weight:700}
+.detail{border-top:1px solid var(--line);padding:10px 16px;font-size:15px}.detail div{display:flex;justify-content:space-between;padding:2px 0}
+a{color:var(--pip)}
+table{width:100%;border-collapse:collapse;background:var(--panel);border:1px solid var(--line);border-radius:12px;overflow:hidden}
+th,td{padding:10px 12px;text-align:right;border-bottom:1px solid var(--line);font-size:15px}
+th{font-weight:500;color:var(--mute);font-size:14px}th:nth-child(2),td:nth-child(2){text-align:left}
+.wr{display:inline-block;width:60px;height:6px;background:var(--off);border-radius:9px;margin-right:8px;vertical-align:middle}.wr i{display:block;height:100%;background:var(--good);border-radius:9px}
+.scroll{overflow-x:auto}.note{color:var(--mute);font-size:14px;margin:10px 2px}.empty{padding:40px;text-align:center;color:var(--mute)}
+:focus-visible{outline:2px solid var(--pip);outline-offset:2px}
 </style>
 </head>
 <body>
 <main>
   <h1>Where the top earners agree</h1>
   <p class="sub" id="meta">Loading…</p>
-  <div class="controls">
-    <label>At least <input type="range" id="min" min="1" max="20" value="3"> <span id="minv">3</span> top traders</label>
-    <label>Sort by
-      <select id="sort"><option value="count">Most traders</option><option value="value">Most money</option></select>
-    </label>
-    <label>Search <input type="text" id="q" placeholder="market name"></label>
+  <div class="tabs" role="tablist">
+    <button class="tab" role="tab" id="t-m" aria-selected="true">Markets</button>
+    <button class="tab" role="tab" id="t-t" aria-selected="false">Traders</button>
   </div>
-  <div id="list"></div>
+  <section id="markets">
+    <div class="bar">
+      <div class="chips" id="chips"></div>
+      <div class="ctl">
+        <label>At least <input type="range" id="min" min="1" max="20" value="3"> <b id="minv">3</b> traders</label>
+        <label>Ends within <select id="end"><option value="0">Any time</option><option value="1">24 hours</option><option value="7">7 days</option><option value="30">30 days</option></select></label>
+        <label>Sort by <select id="sort"><option value="count">Most traders</option><option value="value">Most money</option><option value="end">Ending soonest</option></select></label>
+        <label>Search <input type="text" id="q" placeholder="market name"></label>
+      </div>
+    </div>
+    <div id="list"></div>
+  </section>
+  <section id="traders" hidden></section>
 </main>
 <script>
 const $ = id => document.getElementById(id);
 const money = n => n >= 1e6 ? "$" + (n/1e6).toFixed(1) + "M" : n >= 1e3 ? "$" + (n/1e3).toFixed(1) + "K" : "$" + Math.round(n);
 const cents = p => p == null ? "–" : Math.round(p * 100) + "¢";
-let data = null;
+const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const daysLeft = e => e ? (new Date(e + (e.length <= 10 ? "T23:59:59Z" : "")) - Date.now()) / 864e5 : null;
+let data, cat = "All";
 
-function esc(s){return String(s ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]))}
+function renderChips(){
+  const counts = {All: data.positions.length};
+  data.positions.forEach(p => counts[p.category] = (counts[p.category] || 0) + 1);
+  $("chips").innerHTML = Object.keys(counts).map(c =>
+    `<button class="chip" aria-pressed="${c === cat}" data-c="${esc(c)}">${esc(c)} (${counts[c]})</button>`).join("");
+  $("chips").querySelectorAll("button").forEach(b => b.onclick = () => { cat = b.dataset.c; renderChips(); render(); });
+}
 
 function render(){
-  const min = +$("min").value, q = $("q").value.toLowerCase(), by = $("sort").value;
+  const min = +$("min").value, q = $("q").value.toLowerCase(), by = $("sort").value, within = +$("end").value;
   $("minv").textContent = min;
-  const rows = data.positions
-    .filter(r => r.trader_count >= min && (r.title || "").toLowerCase().includes(q))
-    .sort((a,b) => by === "value" ? b.total_value - a.total_value : b.trader_count - a.trader_count || b.total_value - a.total_value);
-  $("list").innerHTML = rows.length ? rows.map(r => `
-    <details class="row">
-      <summary>
-        <div class="title"><span class="pill ${esc(r.outcome)}">${esc(r.outcome)}</span><a href="https://polymarket.com/event/${esc(r.slug)}" target="_blank" rel="noopener">${esc(r.title)}</a></div>
-        <div class="big">${r.trader_count} of ${data.trader_pool}</div>
-        <div class="meter"><div class="bar"><i style="width:${r.trader_count / data.trader_pool * 100}%"></i></div>
-          <span>${money(r.total_value)} held · avg entry ${cents(r.avg_entry)} · now ${cents(r.price)}</span></div>
-      </summary>
-      <div class="detail">${r.traders.map(t => `<div><a href="https://polymarket.com/profile/${esc(t.wallet)}" target="_blank" rel="noopener">${esc(t.name)}</a><span>${money(t.value)}</span></div>`).join("")}</div>
-    </details>`).join("") : '<div class="empty">No positions match. Lower the minimum number of traders.</div>';
+  const rows = data.positions.filter(r => {
+    const d = daysLeft(r.end);
+    return r.trader_count >= min && (cat === "All" || r.category === cat) &&
+      (r.title || "").toLowerCase().includes(q) &&
+      (!within || (d != null && d >= 0 && d <= within));
+  }).sort((a,b) => by === "value" ? b.total_value - a.total_value
+    : by === "end" ? (daysLeft(a.end) ?? 1e9) - (daysLeft(b.end) ?? 1e9)
+    : b.trader_count - a.trader_count || b.total_value - a.total_value);
+  $("list").innerHTML = rows.length ? rows.slice(0, 200).map(r => {
+    const d = daysLeft(r.end);
+    const when = d == null ? "" : d < 0 ? "ended" : d < 1 ? "ends today" : `ends in ${Math.ceil(d)}d`;
+    const pips = Array.from({length: data.trader_pool}, (_, i) => `<i class="${i < r.trader_count ? "on" : ""}"></i>`).join("");
+    return `<details class="row"><summary>
+      <div class="top"><div class="title"><span class="side ${esc(r.outcome)}">${esc(r.outcome)}</span><a href="https://polymarket.com/event/${esc(r.slug)}" target="_blank" rel="noopener">${esc(r.title)}</a></div>
+      <div class="count">${r.trader_count}<small> of ${data.trader_pool}</small></div></div>
+      <div class="pips" aria-hidden="true">${pips}</div>
+      <div class="meta"><span class="tag">${esc(r.category)}</span>${when ? `<span class="tag ${d != null && d >= 0 && d <= 7 ? "soon" : ""}">${when}</span>` : ""}
+        <span>${money(r.total_value)} held</span><span>avg entry ${cents(r.avg_entry)}</span><span>now ${cents(r.price)}</span></div>
+    </summary><div class="detail">${r.traders.map(t => `<div><a href="https://polymarket.com/profile/${esc(t.wallet)}" target="_blank" rel="noopener">${esc(t.name)}</a><span>${money(t.value)}</span></div>`).join("")}</div></details>`;
+  }).join("") : '<div class="empty">No markets match these filters. Try lowering the minimum number of traders.</div>';
+}
+
+function renderTraders(){
+  $("traders").innerHTML = `<p class="note">Ranked by profit over the past ${esc(data.period.toLowerCase())}. Win rate is the share of each trader’s last 50 closed positions that made money.</p>
+  <div class="scroll"><table><thead><tr><th>#</th><th>Trader</th><th>Profit</th><th>Volume</th><th>Win rate</th><th>Open</th></tr></thead><tbody>` +
+  data.traders.map(t => `<tr><td>${t.rank}</td><td><a href="https://polymarket.com/profile/${esc(t.wallet)}" target="_blank" rel="noopener">${esc(t.name)}</a></td>
+    <td>${money(t.pnl)}</td><td>${money(t.volume)}</td>
+    <td>${t.win_rate == null ? "–" : `<span class="wr"><i style="width:${t.win_rate*100}%"></i></span>${Math.round(t.win_rate*100)}%`}</td><td>${t.open_positions}</td></tr>`).join("") + "</tbody></table></div>";
+}
+
+function show(tab){
+  $("markets").hidden = tab !== "m"; $("traders").hidden = tab !== "t";
+  $("t-m").setAttribute("aria-selected", tab === "m"); $("t-t").setAttribute("aria-selected", tab === "t");
 }
 
 fetch("data.json").then(r => r.json()).then(d => {
@@ -80,9 +124,10 @@ fetch("data.json").then(r => r.json()).then(d => {
   const max = Math.max(1, ...d.positions.map(p => p.trader_count));
   $("min").max = max; $("min").value = Math.min(3, max);
   $("meta").textContent = `Positions held by the top ${d.trader_pool} earners (${d.category.toLowerCase()}, past ${d.period.toLowerCase()}). Updated ${new Date(d.generated_at).toLocaleString()}.`;
-  ["min","sort","q"].forEach(id => $(id).addEventListener("input", render));
-  render();
-}).catch(() => { $("meta").textContent = "Couldn’t load data.json. Run fetch_consensus.py first, and open this page through a local server (python -m http.server)."; });
+  ["min","sort","q","end"].forEach(id => $(id).addEventListener("input", render));
+  $("t-m").onclick = () => show("m"); $("t-t").onclick = () => show("t");
+  renderChips(); render(); renderTraders();
+}).catch(() => { $("meta").textContent = "Couldn’t load data.json. Check that the Update data workflow has run."; });
 </script>
 </body>
 </html>
