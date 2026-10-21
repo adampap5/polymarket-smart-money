@@ -3,7 +3,7 @@
 Usage: python fetch_consensus.py [--top 50] [--period MONTH] [--category OVERALL]
 Standard library only. Uses Polymarket's public Data API (no key needed).
 """
-import argparse, json, time, urllib.parse, urllib.request
+import argparse, json, os, time, urllib.parse, urllib.request
 from collections import defaultdict
 from datetime import datetime, timezone
 
@@ -57,6 +57,26 @@ def win_rate(wallet):
     return round(wins / len(closed), 3), len(closed)
 
 
+def update_history(rows, keep_days=7, min_traders=3):
+    """Append this run's trader counts to history.json so we can chart consensus over time."""
+    path = "history.json"
+    try:
+        with open(path) as f:
+            hist = json.load(f)
+    except Exception:
+        hist = {"snaps": []}
+    now = datetime.now(timezone.utc)
+    counts = {f"{r['conditionId'][:12]}|{r['outcome']}": r["trader_count"]
+              for r in rows if r["trader_count"] >= min_traders}
+    hist["snaps"].append({"t": now.isoformat(timespec="minutes"), "c": counts})
+    cutoff = now.timestamp() - keep_days * 86400
+    hist["snaps"] = [s for s in hist["snaps"]
+                     if datetime.fromisoformat(s["t"]).timestamp() >= cutoff]
+    with open(path, "w") as f:
+        json.dump(hist, f, separators=(",", ":"))
+    print(f"history.json now has {len(hist['snaps'])} snapshots")
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--top", type=int, default=50)
@@ -69,7 +89,7 @@ def main():
                   orderBy="PNL", limit=min(args.top, 50))
     print(f"Tracking {len(leaders)} traders ({args.category}, {args.period}, by profit)")
 
-    groups = defaultdict(lambda: {"traders": [], "value": 0.0, "cost": 0.0, "shares": 0.0})
+    groups = defaultdict(lambda: {"traders": [], "value": 0.0, "invested": 0.0, "cost": 0.0, "shares": 0.0})
     trader_rows = []
     for i, t in enumerate(leaders, 1):
         wallet = t["proxyWallet"]
@@ -95,6 +115,7 @@ def main():
                      price=p.get("curPrice"), end=p.get("endDate"))
             g["traders"].append({"name": name, "wallet": wallet, "value": round(value, 2)})
             g["value"] += value
+            g["invested"] += float(p.get("initialValue") or 0)
             g["cost"] += float(p.get("avgPrice") or 0) * float(p.get("size") or 0)
             g["shares"] += float(p.get("size") or 0)
         time.sleep(0.25)
@@ -107,6 +128,7 @@ def main():
             "category": classify(g["title"]),
             "trader_count": len(g["traders"]),
             "total_value": round(g["value"], 2),
+            "invested": round(g["invested"], 2),
             "avg_entry": round(g["cost"] / g["shares"], 3) if g["shares"] else None,
             "traders": sorted(g["traders"], key=lambda x: -x["value"]),
         })
@@ -117,6 +139,7 @@ def main():
            "traders": trader_rows, "positions": rows}
     with open("data.json", "w") as f:
         json.dump(out, f)
+    update_history(rows)
     print(f"Wrote data.json with {len(rows)} position groups")
 
 

@@ -34,6 +34,7 @@ input[type=range]{accent-color:var(--pip)}
 .meta{display:flex;flex-wrap:wrap;gap:4px 16px;font-size:14px;color:var(--mute)}
 .tag{background:var(--off);padding:0 8px;border-radius:99px;color:var(--ink);font-size:13px}.tag.soon{background:var(--hl);color:var(--hlink);font-weight:700}
 .detail{border-top:1px solid var(--line);padding:10px 16px;font-size:15px}.detail div{display:flex;justify-content:space-between;padding:2px 0}
+.up{color:var(--good)}.down{color:var(--bad)}
 a{color:var(--pip)}
 table{width:100%;border-collapse:collapse;background:var(--panel);border:1px solid var(--line);border-radius:12px;overflow:hidden}
 th,td{padding:10px 12px;text-align:right;border-bottom:1px solid var(--line);font-size:15px}
@@ -68,6 +69,8 @@ th{font-weight:500;color:var(--mute);font-size:14px}th:nth-child(2),td:nth-child
 <script>
 const $ = id => document.getElementById(id);
 const money = n => n >= 1e6 ? "$" + (n/1e6).toFixed(1) + "M" : n >= 1e3 ? "$" + (n/1e3).toFixed(1) + "K" : "$" + Math.round(n);
+const pnl = r => { if (!r.invested) return ""; const x = r.total_value / r.invested - 1;
+  return `<b class="${x >= 0 ? "up" : "down"}">${x >= 0 ? "+" : "−"}${Math.abs(Math.round(x * 100))}%</b>`; };
 const cents = p => p == null ? "–" : Math.round(p * 100) + "¢";
 const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 const daysLeft = e => e ? (new Date(e + (e.length <= 10 ? "T23:59:59Z" : "")) - Date.now()) / 864e5 : null;
@@ -101,7 +104,7 @@ function render(){
       <div class="count">${r.trader_count}<small> of ${data.trader_pool}</small></div></div>
       <div class="pips" aria-hidden="true">${pips}</div>
       <div class="meta"><span class="tag">${esc(r.category)}</span>${when ? `<span class="tag ${d != null && d >= 0 && d <= 7 ? "soon" : ""}">${when}</span>` : ""}
-        <span>${money(r.total_value)} held</span><span>avg entry ${cents(r.avg_entry)}</span><span>now ${cents(r.price)}</span></div>
+        <span>${money(r.invested)} in → ${money(r.total_value)} now ${pnl(r)}</span><span>avg entry ${cents(r.avg_entry)}</span><span>now ${cents(r.price)}</span></div>
     </summary><div class="detail">${r.traders.map(t => `<div><a href="https://polymarket.com/profile/${esc(t.wallet)}" target="_blank" rel="noopener">${esc(t.name)}</a><span>${money(t.value)}</span></div>`).join("")}</div></details>`;
   }).join("") : '<div class="empty">No markets match these filters. Try lowering the minimum number of traders.</div>';
 }
