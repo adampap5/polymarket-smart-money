@@ -3,63 +3,86 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Where the top earners agree</title>
+<title>Smart Money Tracker</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:wght@400;500;700;800&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <style>
-:root{--bg:#eef2ee;--panel:#fff;--ink:#12202e;--mute:#5d6b78;--line:#d6ddd6;--pip:#1f4fd8;--off:#d3dad6;--good:#0b8a5b;--bad:#c23b3b;--hl:#ffe45c;--hlink:#12202e}
-@media (prefers-color-scheme:dark){:root{--bg:#0e1620;--panel:#162230;--ink:#e8eef3;--mute:#93a3b2;--line:#273748;--pip:#6f93ff;--off:#2b3b4b;--good:#3fd09c;--bad:#ff7d7d;--hl:#ffe45c;--hlink:#12202e}}
+:root{--bg:#0e1118;--panel:#161b25;--panel2:#1c2230;--line:#262e3d;--ink:#e9edf5;--mute:#8a95a8;--accent:#7b8cff;--off:#262e3d;--good:#34d399;--bad:#f87171;--warn:#fbbf24;--warnink:#1a1400}
+@media (prefers-color-scheme:light){:root{--bg:#f3f5fa;--panel:#fff;--panel2:#f0f2f8;--line:#e0e4ee;--ink:#141a28;--mute:#667086;--accent:#4f5fe8;--off:#e3e7f0;--good:#0e9f6e;--bad:#d64545;--warn:#fbbf24;--warnink:#1a1400}}
 *{box-sizing:border-box}
-body{margin:0;background:var(--bg);color:var(--ink);font:400 16px/1.45 "Schibsted Grotesk",system-ui,sans-serif;font-variant-numeric:tabular-nums}
-main{max-width:980px;margin:0 auto;padding:28px 18px 70px}
-h1{font-weight:800;font-size:clamp(30px,6vw,52px);line-height:1;letter-spacing:-.03em;margin:0 0 8px}
-.sub{color:var(--mute);margin:0 0 22px}
-.tabs{display:flex;gap:6px;margin-bottom:16px}
-.tab,.chip{font:inherit;border:1px solid var(--line);background:var(--panel);color:var(--ink);padding:7px 14px;border-radius:99px;cursor:pointer}
-.tab[aria-selected=true],.chip[aria-pressed=true]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
-.bar{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px 16px;margin-bottom:16px;display:grid;gap:12px}
-.chips{display:flex;flex-wrap:wrap;gap:6px}.chip{padding:4px 12px;font-size:14px}
-.ctl{display:flex;flex-wrap:wrap;gap:14px 22px;align-items:center}
-.ctl label{display:flex;gap:8px;align-items:center;font-weight:500;font-size:15px}
-select,input[type=text]{font:inherit;padding:6px 8px;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--ink)}
-input[type=range]{accent-color:var(--pip)}
-.row{background:var(--panel);border:1px solid var(--line);border-radius:12px;margin-bottom:10px}
-.row summary{list-style:none;cursor:pointer;padding:14px 16px;display:grid;gap:8px}
+body{margin:0;background:var(--bg);color:var(--ink);font:500 15px/1.5 Manrope,system-ui,sans-serif;font-variant-numeric:tabular-nums}
+main{max-width:1000px;margin:0 auto;padding:32px 18px 80px}
+header{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:flex-end;gap:12px;margin-bottom:20px}
+h1{font-weight:800;font-size:clamp(26px,5vw,38px);letter-spacing:-.03em;margin:0;line-height:1.1}
+.sub{color:var(--mute);margin:6px 0 0;font-size:14px}
+.tabs{display:flex;gap:4px;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:4px}
+.tab{font:inherit;font-weight:700;border:0;background:none;color:var(--mute);padding:8px 18px;border-radius:9px;cursor:pointer}
+.tab[aria-selected=true]{background:var(--accent);color:#fff}
+.help{background:var(--panel);border:1px solid var(--line);border-radius:14px;margin-bottom:14px}
+.help summary{cursor:pointer;padding:12px 18px;font-weight:700;color:var(--accent)}
+.help ul{margin:0;padding:0 18px 14px 36px;color:var(--mute);font-size:14px}.help li{margin:4px 0}.help b{color:var(--ink)}
+.bar{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:16px 18px;margin-bottom:16px;display:grid;gap:14px}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{font:inherit;font-weight:600;font-size:13px;border:1px solid var(--line);background:var(--panel2);color:var(--mute);padding:5px 12px;border-radius:99px;cursor:pointer}
+.chip[aria-pressed=true]{background:var(--accent);border-color:var(--accent);color:#fff}
+.ctl{display:flex;flex-wrap:wrap;gap:14px 24px}
+.ctl label{display:grid;gap:4px;font-size:12px;color:var(--mute);font-weight:600}
+.ctl label span{display:flex;gap:10px;align-items:center;color:var(--ink);font-size:14px}
+select,input[type=text]{font:inherit;font-size:14px;padding:7px 10px;border:1px solid var(--line);border-radius:8px;background:var(--panel2);color:var(--ink)}
+input[type=range]{accent-color:var(--accent)}
+.row{background:var(--panel);border:1px solid var(--line);border-radius:16px;margin-bottom:12px;transition:border-color .15s}
+.row[open],.row:hover{border-color:var(--accent)}
+.row summary{list-style:none;cursor:pointer;padding:18px 20px;display:grid;gap:14px}
 .row summary::-webkit-details-marker{display:none}
-.top{display:flex;justify-content:space-between;gap:14px;align-items:baseline}
-.title{font-weight:700}.title a{color:inherit;text-decoration:none}.title a:hover{text-decoration:underline}
-.side{font-weight:800;margin-right:8px;color:var(--good)}.side.No{color:var(--bad)}
-.count{font-weight:800;font-size:24px;white-space:nowrap}.count small{font-weight:500;font-size:14px;color:var(--mute)}
-.pips{display:flex;flex-wrap:wrap;gap:2px}.pips i{width:6px;height:16px;border-radius:2px;background:var(--off)}.pips i.on{background:var(--pip)}
-.meta{display:flex;flex-wrap:wrap;gap:4px 16px;font-size:14px;color:var(--mute)}
-.tag{background:var(--off);padding:0 8px;border-radius:99px;color:var(--ink);font-size:13px}.tag.soon{background:var(--hl);color:var(--hlink);font-weight:700}
-.detail{border-top:1px solid var(--line);padding:10px 16px;font-size:15px}.detail div{display:flex;justify-content:space-between;padding:2px 0}
-.up{color:var(--good)}.down{color:var(--bad)}
-a{color:var(--pip)}
-table{width:100%;border-collapse:collapse;background:var(--panel);border:1px solid var(--line);border-radius:12px;overflow:hidden}
-th,td{padding:10px 12px;text-align:right;border-bottom:1px solid var(--line);font-size:15px}
-th{font-weight:500;color:var(--mute);font-size:14px}th:nth-child(2),td:nth-child(2){text-align:left}
-.wr{display:inline-block;width:60px;height:6px;background:var(--off);border-radius:9px;margin-right:8px;vertical-align:middle}.wr i{display:block;height:100%;background:var(--good);border-radius:9px}
-.scroll{overflow-x:auto}.note{color:var(--mute);font-size:14px;margin:10px 2px}.empty{padding:40px;text-align:center;color:var(--mute)}
-:focus-visible{outline:2px solid var(--pip);outline-offset:2px}
+.head{display:flex;justify-content:space-between;gap:16px;align-items:flex-start}
+.bet{display:flex;gap:10px;align-items:flex-start;font-weight:700;font-size:17px;line-height:1.3}
+.bet a{color:inherit;text-decoration:none}.bet a:hover{text-decoration:underline}
+.side{flex:none;font-size:12px;font-weight:800;padding:3px 10px;border-radius:7px;margin-top:2px;background:var(--panel2);color:var(--ink)}
+.side.Yes{background:rgba(52,211,153,.16);color:var(--good)}.side.No{background:rgba(248,113,113,.16);color:var(--bad)}
+.count{text-align:right;flex:none;line-height:1.1}.count b{font-size:30px;font-weight:800;letter-spacing:-.02em}.count span{display:block;font-size:12px;color:var(--mute);font-weight:600}
+.pips{display:flex;flex-wrap:wrap;gap:3px}.pips i{width:7px;height:18px;border-radius:3px;background:var(--off)}.pips i.on{background:var(--accent)}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:12px;margin:0}
+.stats div{background:var(--panel2);border-radius:10px;padding:9px 12px}
+.stats dt{font-size:11.5px;color:var(--mute);font-weight:600;margin:0}.stats dd{margin:2px 0 0;font-weight:700;font-size:16px}
+.stats em{font-style:normal;font-size:13px;margin-left:6px}
+.tags{display:flex;gap:6px;flex-wrap:wrap}
+.tag{font-size:12px;font-weight:700;padding:2px 10px;border-radius:99px;background:var(--panel2);color:var(--mute)}.tag.soon{background:var(--warn);color:var(--warnink)}
+.detail{border-top:1px solid var(--line);padding:12px 20px 16px}
+.detail h3{margin:0 0 6px;font-size:12px;color:var(--mute);font-weight:600}
+.detail div{display:flex;justify-content:space-between;padding:3px 0}
+.up{color:var(--good)}.down{color:var(--bad)}a{color:var(--accent)}
+table{width:100%;border-collapse:collapse;background:var(--panel);border:1px solid var(--line);border-radius:14px;overflow:hidden}
+th,td{padding:12px 14px;text-align:right;border-bottom:1px solid var(--line);font-size:14px}
+th{font-weight:600;color:var(--mute);font-size:12px;background:var(--panel2)}th:nth-child(2),td:nth-child(2){text-align:left}
+.wr{display:inline-block;width:56px;height:6px;background:var(--off);border-radius:9px;margin-right:8px;vertical-align:middle}.wr i{display:block;height:100%;background:var(--good);border-radius:9px}
+.scroll{overflow-x:auto}.note{color:var(--mute);font-size:13px;margin:0 2px 12px}.empty{padding:48px;text-align:center;color:var(--mute)}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 </style>
 </head>
 <body>
 <main>
-  <h1>Where the top earners agree</h1>
-  <p class="sub" id="meta">Loading…</p>
-  <div class="tabs" role="tablist">
-    <button class="tab" role="tab" id="t-m" aria-selected="true">Markets</button>
-    <button class="tab" role="tab" id="t-t" aria-selected="false">Traders</button>
-  </div>
+  <header>
+    <div><h1>Smart Money Tracker</h1><p class="sub" id="meta">Loading…</p></div>
+    <div class="tabs" role="tablist">
+      <button class="tab" role="tab" id="t-m" aria-selected="true">Markets</button>
+      <button class="tab" role="tab" id="t-t" aria-selected="false">Top traders</button>
+    </div>
+  </header>
   <section id="markets">
+    <details class="help"><summary>How to read this</summary><ul>
+      <li>Each card is <b>one side of one market</b>. A green <b>Yes</b> means these traders bet that it happens. A red <b>No</b> means they bet it doesn’t.</li>
+      <li>The row of bars is the group of top earners we track. A <b>colored bar means that trader holds this bet.</b> More colored bars means more agreement.</li>
+      <li><b>Put in</b> is what they paid. <b>Worth now</b> is what it’s worth at today’s price. The percentage shows whether they’re currently up or down.</li>
+      <li><b>Avg buy price</b> and <b>Price now</b> are in cents, and 55¢ means the market thinks there’s about a 55% chance. If the price now is higher than what they paid, the market has moved their way.</li>
+      <li>Click a card to see which traders hold it and how much each has in.</li>
+    </ul></details>
     <div class="bar">
       <div class="chips" id="chips"></div>
       <div class="ctl">
-        <label>At least <input type="range" id="min" min="1" max="20" value="3"> <b id="minv">3</b> traders</label>
-        <label>Ends within <select id="end"><option value="0">Any time</option><option value="1">24 hours</option><option value="7">7 days</option><option value="30">30 days</option></select></label>
-        <label>Sort by <select id="sort"><option value="count">Most traders</option><option value="value">Most money</option><option value="end">Ending soonest</option></select></label>
-        <label>Search <input type="text" id="q" placeholder="market name"></label>
+        <label>Minimum traders on one side<span><input type="range" id="min" min="1" max="20" value="3"> <b id="minv">3</b></span></label>
+        <label>Market closes within<select id="end"><option value="0">Any time</option><option value="1">24 hours</option><option value="7">7 days</option><option value="30">30 days</option></select></label>
+        <label>Sort by<select id="sort"><option value="count">Most traders agree</option><option value="value">Most money</option><option value="end">Closing soonest</option></select></label>
+        <label>Search<input type="text" id="q" placeholder="Type a market name"></label>
       </div>
     </div>
     <div id="list"></div>
@@ -68,19 +91,19 @@ th{font-weight:500;color:var(--mute);font-size:14px}th:nth-child(2),td:nth-child
 </main>
 <script>
 const $ = id => document.getElementById(id);
-const money = n => n >= 1e6 ? "$" + (n/1e6).toFixed(1) + "M" : n >= 1e3 ? "$" + (n/1e3).toFixed(1) + "K" : "$" + Math.round(n);
-const pnl = r => { if (!r.invested) return ""; const x = r.total_value / r.invested - 1;
-  return `<b class="${x >= 0 ? "up" : "down"}">${x >= 0 ? "+" : "−"}${Math.abs(Math.round(x * 100))}%</b>`; };
+const money = n => n == null || isNaN(n) ? "–" : n >= 1e6 ? "$" + (n/1e6).toFixed(1) + "M" : n >= 1e3 ? "$" + (n/1e3).toFixed(1) + "K" : "$" + Math.round(n);
 const cents = p => p == null ? "–" : Math.round(p * 100) + "¢";
 const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 const daysLeft = e => e ? (new Date(e + (e.length <= 10 ? "T23:59:59Z" : "")) - Date.now()) / 864e5 : null;
+const pnl = r => { if (!r.invested) return ""; const x = r.total_value / r.invested - 1;
+  return `<em class="${x >= 0 ? "up" : "down"}">${x >= 0 ? "+" : "−"}${Math.abs(Math.round(x * 100))}%</em>`; };
 let data, cat = "All";
 
 function renderChips(){
   const counts = {All: data.positions.length};
   data.positions.forEach(p => counts[p.category] = (counts[p.category] || 0) + 1);
   $("chips").innerHTML = Object.keys(counts).map(c =>
-    `<button class="chip" aria-pressed="${c === cat}" data-c="${esc(c)}">${esc(c)} (${counts[c]})</button>`).join("");
+    `<button class="chip" aria-pressed="${c === cat}" data-c="${esc(c)}">${esc(c)} · ${counts[c]}</button>`).join("");
   $("chips").querySelectorAll("button").forEach(b => b.onclick = () => { cat = b.dataset.c; renderChips(); render(); });
 }
 
@@ -90,30 +113,34 @@ function render(){
   const rows = data.positions.filter(r => {
     const d = daysLeft(r.end);
     return r.trader_count >= min && (cat === "All" || r.category === cat) &&
-      (r.title || "").toLowerCase().includes(q) &&
-      (!within || (d != null && d >= 0 && d <= within));
+      (r.title || "").toLowerCase().includes(q) && (!within || (d != null && d >= 0 && d <= within));
   }).sort((a,b) => by === "value" ? b.total_value - a.total_value
     : by === "end" ? (daysLeft(a.end) ?? 1e9) - (daysLeft(b.end) ?? 1e9)
     : b.trader_count - a.trader_count || b.total_value - a.total_value);
   $("list").innerHTML = rows.length ? rows.slice(0, 200).map(r => {
     const d = daysLeft(r.end);
-    const when = d == null ? "" : d < 0 ? "ended" : d < 1 ? "ends today" : `ends in ${Math.ceil(d)}d`;
+    const when = d == null ? "" : d < 0 ? "Closed" : d < 1 ? "Closes today" : `Closes in ${Math.ceil(d)} days`;
     const pips = Array.from({length: data.trader_pool}, (_, i) => `<i class="${i < r.trader_count ? "on" : ""}"></i>`).join("");
     return `<details class="row"><summary>
-      <div class="top"><div class="title"><span class="side ${esc(r.outcome)}">${esc(r.outcome)}</span><a href="https://polymarket.com/event/${esc(r.slug)}" target="_blank" rel="noopener">${esc(r.title)}</a></div>
-      <div class="count">${r.trader_count}<small> of ${data.trader_pool}</small></div></div>
+      <div class="head"><div class="bet"><span class="side ${esc(r.outcome)}">${esc(r.outcome).toUpperCase()}</span><a href="https://polymarket.com/event/${esc(r.slug)}" target="_blank" rel="noopener">${esc(r.title)}</a></div>
+        <div class="count"><b>${r.trader_count}</b><span>of ${data.trader_pool} top traders</span></div></div>
       <div class="pips" aria-hidden="true">${pips}</div>
-      <div class="meta"><span class="tag">${esc(r.category)}</span>${when ? `<span class="tag ${d != null && d >= 0 && d <= 7 ? "soon" : ""}">${when}</span>` : ""}
-        <span>${money(r.invested)} in → ${money(r.total_value)} now ${pnl(r)}</span><span>avg entry ${cents(r.avg_entry)}</span><span>now ${cents(r.price)}</span></div>
-    </summary><div class="detail">${r.traders.map(t => `<div><a href="https://polymarket.com/profile/${esc(t.wallet)}" target="_blank" rel="noopener">${esc(t.name)}</a><span>${money(t.value)}</span></div>`).join("")}</div></details>`;
+      <dl class="stats">
+        <div><dt>Put in</dt><dd>${r.invested ? money(r.invested) : "–"}</dd></div>
+        <div><dt>Worth now</dt><dd>${money(r.total_value)}${pnl(r)}</dd></div>
+        <div><dt>Avg buy price</dt><dd>${cents(r.avg_entry)}</dd></div>
+        <div><dt>Price now</dt><dd>${cents(r.price)}</dd></div>
+      </dl>
+      <div class="tags"><span class="tag">${esc(r.category)}</span>${when ? `<span class="tag ${d != null && d >= 0 && d <= 7 ? "soon" : ""}">${when}</span>` : ""}</div>
+    </summary><div class="detail"><h3>Top traders holding this</h3>${r.traders.map(t => `<div><a href="https://polymarket.com/profile/${esc(t.wallet)}" target="_blank" rel="noopener">${esc(t.name)}</a><span>${money(t.value)}</span></div>`).join("")}</div></details>`;
   }).join("") : '<div class="empty">No markets match these filters. Try lowering the minimum number of traders.</div>';
 }
 
 function renderTraders(){
-  $("traders").innerHTML = `<p class="note">Ranked by profit over the past ${esc(data.period.toLowerCase())}. Win rate is the share of each trader’s last 50 closed positions that made money.</p>
-  <div class="scroll"><table><thead><tr><th>#</th><th>Trader</th><th>Profit</th><th>Volume</th><th>Win rate</th><th>Open</th></tr></thead><tbody>` +
+  $("traders").innerHTML = `<p class="note">The ${data.trader_pool} traders with the most profit over the past ${esc(data.period.toLowerCase())}. Win rate is the share of each trader’s last 50 closed bets that made money.</p>
+  <div class="scroll"><table><thead><tr><th>#</th><th>Trader</th><th>Profit</th><th>Total traded</th><th>Win rate</th><th>Open bets</th></tr></thead><tbody>` +
   data.traders.map(t => `<tr><td>${t.rank}</td><td><a href="https://polymarket.com/profile/${esc(t.wallet)}" target="_blank" rel="noopener">${esc(t.name)}</a></td>
-    <td>${money(t.pnl)}</td><td>${money(t.volume)}</td>
+    <td class="up">${money(t.pnl)}</td><td>${money(t.volume)}</td>
     <td>${t.win_rate == null ? "–" : `<span class="wr"><i style="width:${t.win_rate*100}%"></i></span>${Math.round(t.win_rate*100)}%`}</td><td>${t.open_positions}</td></tr>`).join("") + "</tbody></table></div>";
 }
 
@@ -126,11 +153,11 @@ fetch("data.json").then(r => r.json()).then(d => {
   data = d;
   const max = Math.max(1, ...d.positions.map(p => p.trader_count));
   $("min").max = max; $("min").value = Math.min(3, max);
-  $("meta").textContent = `Positions held by the top ${d.trader_pool} earners (${d.category.toLowerCase()}, past ${d.period.toLowerCase()}). Updated ${new Date(d.generated_at).toLocaleString()}.`;
+  $("meta").textContent = `Tracking the top ${d.trader_pool} earners of the past ${d.period.toLowerCase()} · Updated ${new Date(d.generated_at).toLocaleString()}`;
   ["min","sort","q","end"].forEach(id => $(id).addEventListener("input", render));
   $("t-m").onclick = () => show("m"); $("t-t").onclick = () => show("t");
   renderChips(); render(); renderTraders();
-}).catch(() => { $("meta").textContent = "Couldn’t load data.json. Check that the Update data workflow has run."; });
+}).catch(() => { $("meta").textContent = "Couldn’t load data.json. Check that the Update data job has run."; });
 </script>
 </body>
 </html>
