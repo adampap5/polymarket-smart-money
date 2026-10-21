@@ -20,7 +20,13 @@ def get(path, **params):
                 return json.load(r)
         except Exception as e:
             if attempt == 2:
-                print(f"  failed {path}: {e}")
+                body = ""
+                if hasattr(e, "read"):
+                    try:
+                        body = e.read().decode()[:300]
+                    except Exception:
+                        pass
+                print(f"  failed {path}: {e} {body}")
                 return []
             time.sleep(1.5 * (attempt + 1))
 
@@ -43,7 +49,11 @@ def main():
         name = t.get("userName") or wallet[:8]
         print(f"[{i}/{len(traders)}] {name}")
         positions = get("/positions", user=wallet, sizeThreshold=1, limit=500,
-                        sortBy="CURRENTVALUE", sortDirection="DESC")
+                        sortBy="CURRENT", sortDirection="DESC")
+        if not isinstance(positions, list):
+            print(f"  unexpected response: {str(positions)[:200]}")
+            positions = []
+        print(f"  {len(positions)} positions")
         for p in positions:
             value = float(p.get("currentValue") or 0)
             if value < args.min_value:
