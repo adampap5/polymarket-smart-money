@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Where the top earners agree</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@500;700&family=Source+Sans+3:wght@400;600&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#eef1f4;--panel:#fff;--ink:#16202b;--mute:#66727f;--line:#d9dfe5;--yes:#0f7b6c;--no:#c4452d;--other:#4b5fb0;--bar:#dfe5ea}
+@media (prefers-color-scheme:dark){:root{--bg:#10151b;--panel:#18202a;--ink:#e7ecf1;--mute:#93a0ad;--line:#2a3541;--yes:#3cc3ad;--no:#ff7a62;--other:#8c9cf0;--bar:#2a3541}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:400 16px/1.5 "Source Sans 3",system-ui,sans-serif}
+main{max-width:920px;margin:0 auto;padding:32px 20px 64px}
+h1{font:700 clamp(28px,5vw,42px)/1.1 "Bricolage Grotesque",sans-serif;margin:0 0 8px;letter-spacing:-.01em}
+.sub{color:var(--mute);margin:0 0 24px}
+.controls{display:flex;flex-wrap:wrap;gap:20px;align-items:center;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:14px 18px;margin-bottom:20px}
+.controls label{display:flex;gap:10px;align-items:center;font-weight:600}
+select,input[type=text]{font:inherit;padding:6px 8px;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--ink)}
+input[type=range]{accent-color:var(--yes)}
+#minv{min-width:1.5ch;text-align:right}
+.row{background:var(--panel);border:1px solid var(--line);border-radius:10px;margin-bottom:10px}
+.row summary{list-style:none;cursor:pointer;display:grid;grid-template-columns:1fr auto;gap:6px 16px;padding:14px 18px}
+.row summary::-webkit-details-marker{display:none}
+.title{font-weight:600}
+.title a{color:inherit;text-decoration:none}.title a:hover{text-decoration:underline}
+.pill{display:inline-block;font-weight:700;font-size:14px;padding:1px 9px;border-radius:99px;margin-right:8px;color:#fff;background:var(--other)}
+.pill.Yes{background:var(--yes)}.pill.No{background:var(--no)}
+.big{font:700 22px "Bricolage Grotesque",sans-serif;text-align:right}
+.meter{grid-column:1/-1;display:flex;align-items:center;gap:12px;color:var(--mute);font-size:14px}
+.bar{flex:1;height:8px;background:var(--bar);border-radius:99px;overflow:hidden;max-width:360px}
+.bar i{display:block;height:100%;background:var(--yes)}
+.detail{border-top:1px solid var(--line);padding:12px 18px;font-size:15px}
+.detail div{display:flex;justify-content:space-between;padding:2px 0}
+.empty{padding:40px;text-align:center;color:var(--mute)}
+:focus-visible{outline:2px solid var(--other);outline-offset:2px}
+</style>
+</head>
+<body>
+<main>
+  <h1>Where the top earners agree</h1>
+  <p class="sub" id="meta">Loading…</p>
+  <div class="controls">
+    <label>At least <input type="range" id="min" min="1" max="20" value="3"> <span id="minv">3</span> top traders</label>
+    <label>Sort by
+      <select id="sort"><option value="count">Most traders</option><option value="value">Most money</option></select>
+    </label>
+    <label>Search <input type="text" id="q" placeholder="market name"></label>
+  </div>
+  <div id="list"></div>
+</main>
+<script>
+const $ = id => document.getElementById(id);
+const money = n => n >= 1e6 ? "$" + (n/1e6).toFixed(1) + "M" : n >= 1e3 ? "$" + (n/1e3).toFixed(1) + "K" : "$" + Math.round(n);
+const cents = p => p == null ? "–" : Math.round(p * 100) + "¢";
+let data = null;
+
+function esc(s){return String(s ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]))}
+
+function render(){
+  const min = +$("min").value, q = $("q").value.toLowerCase(), by = $("sort").value;
+  $("minv").textContent = min;
+  const rows = data.positions
+    .filter(r => r.trader_count >= min && (r.title || "").toLowerCase().includes(q))
+    .sort((a,b) => by === "value" ? b.total_value - a.total_value : b.trader_count - a.trader_count || b.total_value - a.total_value);
+  $("list").innerHTML = rows.length ? rows.map(r => `
+    <details class="row">
+      <summary>
+        <div class="title"><span class="pill ${esc(r.outcome)}">${esc(r.outcome)}</span><a href="https://polymarket.com/event/${esc(r.slug)}" target="_blank" rel="noopener">${esc(r.title)}</a></div>
+        <div class="big">${r.trader_count} of ${data.trader_pool}</div>
+        <div class="meter"><div class="bar"><i style="width:${r.trader_count / data.trader_pool * 100}%"></i></div>
+          <span>${money(r.total_value)} held · avg entry ${cents(r.avg_entry)} · now ${cents(r.price)}</span></div>
+      </summary>
+      <div class="detail">${r.traders.map(t => `<div><a href="https://polymarket.com/profile/${esc(t.wallet)}" target="_blank" rel="noopener">${esc(t.name)}</a><span>${money(t.value)}</span></div>`).join("")}</div>
+    </details>`).join("") : '<div class="empty">No positions match. Lower the minimum number of traders.</div>';
+}
+
+fetch("data.json").then(r => r.json()).then(d => {
+  data = d;
+  const max = Math.max(1, ...d.positions.map(p => p.trader_count));
+  $("min").max = max; $("min").value = Math.min(3, max);
+  $("meta").textContent = `Positions held by the top ${d.trader_pool} earners (${d.category.toLowerCase()}, past ${d.period.toLowerCase()}). Updated ${new Date(d.generated_at).toLocaleString()}.`;
+  ["min","sort","q"].forEach(id => $(id).addEventListener("input", render));
+  render();
+}).catch(() => { $("meta").textContent = "Couldn’t load data.json. Run fetch_consensus.py first, and open this page through a local server (python -m http.server)."; });
+</script>
+</body>
+</html>
