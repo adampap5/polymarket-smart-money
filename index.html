@@ -78,6 +78,20 @@ a{color:var(--g3)}
 .info{width:16px;height:16px;border-radius:50%;background:var(--soft);color:var(--mute);font-size:11px;font-weight:800;display:inline-grid;place-items:center;cursor:help;outline-offset:2px}
 #tip{display:none;position:fixed;z-index:1000;width:260px;max-width:calc(100vw - 16px);background:#fff;border:1px solid var(--line);box-shadow:0 12px 32px rgba(30,60,40,.22);border-radius:12px;padding:10px 12px;font-size:12px;font-weight:500;color:var(--ink);line-height:1.5;pointer-events:none}
 #tip b{display:block;margin-bottom:4px;font-weight:700}#tip p{margin:4px 0}
+.stat{cursor:pointer;transition:border-color .15s,box-shadow .15s,transform .15s}.stat:hover,.stat:focus-visible{border-color:var(--g2);box-shadow:0 6px 18px rgba(60,130,80,.15);transform:translateY(-1px)}
+.hint{margin-left:auto;font-weight:700;color:var(--g3);white-space:nowrap;flex:none}
+#scrim{position:fixed;inset:0;background:rgba(20,40,28,.35);z-index:900}
+#drawer{position:fixed;top:0;right:0;bottom:0;width:min(560px,100vw);background:#fff;z-index:901;box-shadow:-16px 0 40px rgba(30,60,40,.2);display:flex;flex-direction:column}
+#drawer[hidden],#scrim[hidden]{display:none}
+.dh{display:flex;justify-content:space-between;gap:12px;align-items:flex-start;padding:20px 20px 14px;border-bottom:1px solid var(--line)}
+.dh h2{margin:0;font-size:18px;font-weight:800;letter-spacing:-.02em}.dh p{margin:4px 0 0;color:var(--mute);font-size:12.5px;line-height:1.4}
+#dclose{font:inherit;font-size:22px;line-height:1;width:34px;height:34px;flex:none;border-radius:10px;border:1px solid var(--line);background:#fff;cursor:pointer;color:var(--mute)}
+#dbody{overflow:auto;padding:4px 20px 28px}
+.dr{display:flex;gap:12px;padding:14px 0;border-bottom:1px solid var(--line)}.dr:last-child{border-bottom:0}
+.rk{flex:none;width:24px;height:24px;border-radius:8px;background:var(--gbg);color:var(--g3);font-weight:800;font-size:12px;display:grid;place-items:center;margin-top:1px}
+.dm{flex:1;min-width:0}.dm .t{margin-bottom:3px}.ds{color:var(--mute);font-size:12.5px;line-height:1.45}.dm .holders{margin-top:8px;font-size:12.5px;grid-template-columns:repeat(auto-fill,minmax(190px,1fr))}
+.da{text-align:right;flex:none;display:flex;flex-direction:column;align-items:flex-end;gap:6px}.da b{font-size:15px}
+.dfoot{padding:14px 0 0;color:var(--mute);font-size:12.5px}
 .betbtn{display:inline-block;font-size:11.5px;font-weight:700;padding:3px 11px;border-radius:99px;text-decoration:none;background:var(--gbg);color:var(--g3);white-space:nowrap}.betbtn.No{background:var(--rbg);color:var(--red)}.betbtn:hover{filter:brightness(.94);text-decoration:none}
 .feature{background:linear-gradient(145deg,#c4e3c0,#8cc48f);border-radius:20px;padding:18px;color:#143a21;position:relative;overflow:hidden;box-shadow:0 10px 24px rgba(60,130,80,.22)}
 .feature:after{content:"";position:absolute;right:-30px;top:-30px;width:130px;height:130px;border-radius:50%;background:rgba(255,255,255,.22)}
@@ -179,6 +193,11 @@ th{font-weight:600;color:var(--mute);font-size:12px;background:var(--soft)}th:fi
   </section>
 </div>
 <div id="tip" role="tooltip"></div>
+<div id="scrim" hidden></div>
+<aside id="drawer" role="dialog" aria-modal="true" aria-labelledby="dtitle" hidden>
+  <div class="dh"><div><h2 id="dtitle"></h2><p id="dsub"></p></div><button id="dclose" aria-label="Close">×</button></div>
+  <div id="dbody"></div>
+</aside>
 <script>
 const $ = id => document.getElementById(id);
 const money = n => n == null || isNaN(n) ? "–" : n >= 1e6 ? "$" + (n/1e6).toFixed(1) + "M" : n >= 1e3 ? "$" + (n/1e3).toFixed(1) + "K" : "$" + Math.round(n);
@@ -220,18 +239,68 @@ function renderSrc(){
   $("src").querySelectorAll("button").forEach(b => b.onclick = () => load(b.dataset.f));
 }
 
+const bigList = () => (data.recent || []).filter(b => b.big && b.ts >= Date.now()/1000 - 86400);
 function renderCards(){
   const P = data.positions, N = data.trader_pool;
   const top = [...P].sort((a,b) => b.trader_count - a.trader_count || b.total_value - a.total_value)[0];
   const rich = [...P].sort((a,b) => b.total_value - a.total_value)[0];
-  const bigs = (data.recent || []).filter(b => b.big && b.ts >= Date.now()/1000 - 86400).length;
-  const card = (l, v, pill, s, c) => `<div class="stat"><div class="row1">${l}<span class="ico ${c}">●</span></div><div class="v">${v}</div><div class="row3">${pill}<span title="${esc(s)}">${esc(s)}</span></div></div>`;
+  const bigs = bigList().length;
+  const card = (k, l, v, pill, s, c) => `<div class="stat" role="button" tabindex="0" data-k="${k}" aria-haspopup="dialog"><div class="row1">${l}<span class="ico ${c}">●</span></div><div class="v">${v}</div><div class="row3">${pill}<span title="${esc(s)}">${esc(s)}</span><span class="hint">View →</span></div></div>`;
   $("cards").innerHTML =
-    card("Agreed markets", P.filter(p => p.trader_count >= 3).length, `<span class="pill">3+ traders</span>`, `of ${P.length} tracked`, "") +
-    card("Strongest agreement", top ? `${top.trader_count} of ${N}` : "–", top ? `<span class="pill gray">${esc(top.outcome)}</span>` : "", top ? top.title : "", "b") +
-    card("Most money, one side", rich ? money(rich.total_value) : "–", rich ? `<span class="pill gray">${esc(rich.outcome)}</span>` : "", rich ? rich.title : "", "o") +
-    card("Big bets, 24 hours", bigs, `<span class="pill ${bigs ? "big" : "gray"}">${bigs ? "new" : "none"}</span>`, "Unusually large buys", "p");
+    card("agreed", "Agreed markets", P.filter(p => p.trader_count >= 3).length, `<span class="pill">3+ traders</span>`, `of ${P.length} tracked`, "") +
+    card("strong", "Strongest agreement", top ? `${top.trader_count} of ${N}` : "–", top ? `<span class="pill gray">${esc(top.outcome)}</span>` : "", top ? top.title : "", "b") +
+    card("money", "Most money, one side", rich ? money(rich.total_value) : "–", rich ? `<span class="pill gray">${esc(rich.outcome)}</span>` : "", rich ? rich.title : "", "o") +
+    card("bigs", "Big bets, 24 hours", bigs, `<span class="pill ${bigs ? "big" : "gray"}">${bigs ? "new" : "none"}</span>`, "Unusually large buys", "p");
 }
+
+let lastCard = null;
+function closeDrawer(){
+  $("drawer").hidden = true; $("scrim").hidden = true; hideTip();
+  if (lastCard && lastCard.focus) lastCard.focus();
+  lastCard = null;
+}
+function mrow(r, i, extra){
+  return `<div class="dr"><div class="rk">${i + 1}</div><div class="dm"><div class="t"><span class="side-tag ${esc(r.outcome)}">${esc(r.outcome).toUpperCase()}</span>${lnk(r, esc(r.title))}</div>
+    <div class="ds">${r.trader_count} of ${data.trader_pool} top traders · ${money(r.total_value)} now${r.invested ? " (from " + money(r.invested) + ")" : ""} · price ${cents(r.price)}</div>${extra || ""}</div>
+    <div class="da">${pnlPill(chg(r.total_value, r.invested))}${bet(r)}<button class="linkbtn" data-find="${esc(r.title)}">Find in list</button></div></div>`;
+}
+function openDrawer(k, from){
+  const P = data.positions, byCount = [...P].sort((a,b) => b.trader_count - a.trader_count || b.total_value - a.total_value);
+  let title, sub, body;
+  if (k === "agreed") {
+    const l = byCount.filter(p => p.trader_count >= 3);
+    title = "Markets where 3+ top traders agree"; sub = `${l.length} market side${l.length === 1 ? "" : "s"}, most agreement first.`;
+    body = l.slice(0, 30).map((r, i) => mrow(r, i)).join("") + (l.length > 30 ? `<div class="dfoot">Showing the top 30 of ${l.length}. Use the Markets list to see the rest.</div>` : "");
+  } else if (k === "strong") {
+    title = "Strongest agreement"; sub = "The five markets with the most top traders on the same side, and who holds each.";
+    body = byCount.slice(0, 5).map((r, i) => mrow(r, i, `<div class="holders">${r.traders.slice(0, 8).map(t => `<div><a href="https://polymarket.com/profile/${esc(t.wallet)}" target="_blank" rel="noopener">${esc(t.name)}</a><span>${money(t.value)}</span></div>`).join("")}${r.traders.length > 8 ? `<div class="ds">+ ${r.traders.length - 8} more</div>` : ""}</div>`)).join("");
+  } else if (k === "money") {
+    const l = [...P].sort((a,b) => b.total_value - a.total_value).slice(0, 10);
+    title = "Most money on one side"; sub = "The ten biggest combined positions, by what they’re worth now.";
+    body = l.map((r, i) => mrow(r, i)).join("");
+  } else {
+    const l = bigList();
+    title = "Big bets, last 24 hours"; sub = "Buys that were at least 3× that trader’s usual position size and $500 or more.";
+    body = l.length ? l.map((b, i) => `<div class="dr"><div class="rk">${i + 1}</div><div class="dm"><div class="ds">${ago(b.ts)}</div>
+      <div><a href="https://polymarket.com/profile/${esc(b.wallet)}" target="_blank" rel="noopener">${esc(b.name)}</a> bought <span class="side-tag ${esc(b.outcome)}">${esc(b.outcome).toUpperCase()}</span> on ${lnk(b, esc(b.title))}</div>
+      <div class="ds">${b.price != null ? "At " + cents(b.price) + " · " : ""}${Math.round(b.usd / b.typical)}× their usual bet${b.holders ? " · " + b.holders + " top trader" + (b.holders > 1 ? "s" : "") + " hold this now" : ""}</div></div>
+      <div class="da"><b>${money(b.usd)}</b>${bet(b)}</div></div>`).join("")
+      : `<div class="empty">No unusually large bets in the last 24 hours.<br><button class="linkbtn" data-feed="1">See all new bets →</button></div>`;
+  }
+  $("dtitle").textContent = title; $("dsub").textContent = sub; $("dbody").innerHTML = body || '<div class="empty">Nothing to show yet.</div>';
+  lastCard = from || null; $("drawer").hidden = false; $("scrim").hidden = false;
+  $("dbody").scrollTop = 0; if ($("dclose").focus) $("dclose").focus();
+}
+$("cards").addEventListener("click", e => { const c = e.target.closest && e.target.closest(".stat"); if (c) openDrawer(c.dataset.k, c); });
+$("cards").addEventListener("keydown", e => { if (e.key === "Enter" || e.key === " ") { const c = e.target.closest && e.target.closest(".stat"); if (c) { e.preventDefault(); openDrawer(c.dataset.k, c); } } });
+$("dbody").addEventListener("click", e => {
+  const f = e.target.closest && e.target.closest("[data-find]");
+  if (f) { $("q").value = f.dataset.find; closeDrawer(); render(); $("listpanel").scrollIntoView({behavior: "smooth"}); return; }
+  if (e.target.closest && e.target.closest("[data-feed]")) { closeDrawer(); show("f"); }
+});
+$("dclose").addEventListener("click", closeDrawer);
+$("scrim").addEventListener("click", closeDrawer);
+document.addEventListener("keydown", e => { if (e.key === "Escape" && !$("drawer").hidden) closeDrawer(); });
 
 function renderChart(){
   const min = +$("min").value, by = {};
@@ -380,6 +449,7 @@ function renderUs(){
 }
 function apply(){
   const d = raw;
+  $("drawer").hidden = true; $("scrim").hidden = true;
   data = usOn ? {...d, positions: d.positions.filter(p => p.us), recent: (d.recent || []).filter(b => b.us)} : d;
   const max = Math.max(1, ...data.positions.map(p => p.trader_count));
   $("min").max = max; $("min").value = Math.min(3, max);
