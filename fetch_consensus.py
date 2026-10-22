@@ -3,7 +3,7 @@
 Usage: python fetch_consensus.py [--top 50] [--period MONTH] [--category OVERALL]
 Standard library only. Uses Polymarket's public Data API (no key needed).
 """
-import argparse, json, os, re, time, urllib.parse, urllib.request
+import argparse, json, os, re, statistics, time, urllib.parse, urllib.request
 from collections import defaultdict
 from datetime import datetime, timezone
 
@@ -76,6 +76,36 @@ def get(path, **params):
             time.sleep(1.5 * (attempt + 1))
 
 
+def recent_buys(wallet, name, hours, typical):
+    """Recent BUY trades by one trader, merged per market side."""
+    since = time.time() - hours * 3600
+    acts = get("/activity", user=wallet, type="TRADE", limit=500)
+    merged = {}
+    for a in acts if isinstance(acts, list) else []:
+        if a.get("side") != "BUY" or float(a.get("timestamp") or 0) < since:
+            continue
+        usd = float(a.get("usdcSize") or 0) or float(a.get("size") or 0) * float(a.get("price") or 0)
+        k = (a.get("conditionId"), a.get("outcome"))
+        m = merged.setdefault(k, {"usd": 0.0, "shares": 0.0, "n": 0, "ts": 0,
+                                  "title": a.get("title"), "slug": a.get("slug")})
+        m["usd"] += usd
+        m["shares"] += float(a.get("size") or 0)
+        m["n"] += 1
+        m["ts"] = max(m["ts"], int(float(a.get("timestamp") or 0)))
+    out = []
+    for (cond, outcome), m in merged.items():
+        if m["usd"] < 100:
+            continue
+        out.append({
+            "wallet": wallet, "name": name, "conditionId": cond, "outcome": outcome,
+            "title": m["title"], "slug": m["slug"], "usd": round(m["usd"]), "n": m["n"], "ts": m["ts"],
+            "price": round(m["usd"] / m["shares"], 3) if m["shares"] else None,
+            "typical": round(typical),
+            "big": bool(typical and m["usd"] >= 3 * typical and m["usd"] >= 500),
+        })
+    return out
+
+
 def win_rate(wallet):
     """Share of a trader's 50 most recently closed positions that made money."""
     closed = get("/closed-positions", user=wallet, limit=50,
@@ -113,6 +143,7 @@ def main():
     ap.add_argument("--category", default="OVERALL")
     ap.add_argument("--min-value", type=float, default=50)
     ap.add_argument("--out", default="data.json")
+    ap.add_argument("--recent-hours", type=int, default=48)
     ap.add_argument("--no-history", action="store_true")
     args = ap.parse_args()
 
@@ -122,6 +153,7 @@ def main():
 
     groups = defaultdict(lambda: {"traders": [], "value": 0.0, "invested": 0.0, "cost": 0.0, "shares": 0.0})
     trader_rows = []
+    recent = []
     for i, t in enumerate(leaders, 1):
         wallet = t["proxyWallet"]
         name = t.get("userName") or wallet[:8]
@@ -131,6 +163,9 @@ def main():
         if not isinstance(positions, list):
             positions = []
         print(f"  {len(positions)} positions")
+        values = [float(p.get("currentValue") or 0) for p in positions]
+        typical = statistics.median(values) if values else 0
+        recent += recent_buys(wallet, name, args.recent_hours, typical)
         wr, wr_n = win_rate(wallet)
         trader_rows.append({
             "rank": i, "name": name, "wallet": wallet,
@@ -168,10 +203,18 @@ def main():
         if r["category"] == "Sports":
             r["league"] = classify_league(r["title"]) or "Other sports"
     rows.sort(key=lambda r: (-r["trader_count"], -r["total_value"]))
+    held = {(r["conditionId"], r["outcome"]): r for r in rows}
+    for b in recent:
+        g = held.get((b["conditionId"], b["outcome"]))
+        b["holders"] = g["trader_count"] if g else None
+        b["now"] = g["price"] if g else None
+        b["category"] = classify(b["title"])
+        b["league"] = (classify_league(b["title"]) or "Other sports") if b["category"] == "Sports" else None
+    recent.sort(key=lambda b: -b["ts"])
 
     out = {"generated_at": datetime.now(timezone.utc).isoformat(),
            "trader_pool": len(leaders), "period": args.period, "category": args.category,
-           "traders": trader_rows, "positions": rows}
+           "traders": trader_rows, "positions": rows, "recent": recent[:400]}
     with open(args.out, "w") as f:
         json.dump(out, f)
     if not args.no_history:
