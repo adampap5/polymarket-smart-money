@@ -74,6 +74,12 @@ input[type=range]{accent-color:var(--g3)}
 .holders{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:2px 26px}.holders div{display:flex;justify-content:space-between;padding:2px 0}
 a{color:var(--g3)}
 .usnote{font-size:11.5px;color:var(--mute);padding:4px 12px 0;line-height:1.4}.nav:disabled{opacity:.5;cursor:default}
+.bw{position:relative;display:inline-flex;align-items:center;gap:6px}
+.info{width:16px;height:16px;border-radius:50%;background:var(--soft);color:var(--mute);font-size:11px;font-weight:800;display:inline-grid;place-items:center;cursor:help;outline-offset:2px}
+.pop{display:none;position:absolute;z-index:20;top:calc(100% + 6px);right:0;width:260px;white-space:normal;background:#fff;border:1px solid var(--line);box-shadow:0 10px 28px rgba(30,60,40,.16);border-radius:12px;padding:10px 12px;font-size:12px;font-weight:500;color:var(--ink);text-align:left;line-height:1.5;cursor:default}
+.pop b{display:block;margin-bottom:4px;font-weight:700}.pop p{margin:4px 0}
+.bw:hover .pop,.bw:focus-within .pop{display:block}
+.tags .pop{left:0;right:auto}
 .betbtn{display:inline-block;font-size:11.5px;font-weight:700;padding:3px 11px;border-radius:99px;text-decoration:none;background:var(--gbg);color:var(--g3);white-space:nowrap}.betbtn.No{background:var(--rbg);color:var(--red)}.betbtn:hover{filter:brightness(.94);text-decoration:none}
 .feature{background:linear-gradient(145deg,#c4e3c0,#8cc48f);border-radius:20px;padding:18px;color:#143a21;position:relative;overflow:hidden;box-shadow:0 10px 24px rgba(60,130,80,.22)}
 .feature:after{content:"";position:absolute;right:-30px;top:-30px;width:130px;height:130px;border-radius:50%;background:rgba(255,255,255,.22)}
@@ -119,7 +125,7 @@ th{font-weight:600;color:var(--mute);font-size:12px;background:var(--soft)}th:fi
       <li><b>Top traders</b> is how many tracked earners hold that side.</li>
       <li><b>Worth now</b> is today’s value. The percentage compares it to what they put in.</li>
       <li><b>Price</b> is in cents: 55¢ means roughly a 55% chance. Click a row to see who holds it.</li>
-      <li>The <b>Bet</b> buttons open that market on Polymarket. You place the bet there with your own account.</li>
+      <li>The <b>Bet</b> buttons open that market on Polymarket. You place the bet there with your own account. Hover over a button, or tap the <b>?</b> beside it, for a plain-English explanation.</li>
     </ul></details>
   </aside>
 
@@ -184,7 +190,24 @@ const ago = ts => { const m = (Date.now()/1000 - ts) / 60; return m < 60 ? Math.
 const US_MARKET_URL = null; // page address for one Polymarket US market, ending right before the market name
 const href = o => usOn ? (US_MARKET_URL && o.us_slug ? US_MARKET_URL + o.us_slug : null) : "https://polymarket.com/event/" + (o.event_slug || o.slug || "");
 const lnk = (o, text) => { const h = href(o); return h ? `<a href="${esc(h)}" target="_blank" rel="noopener">${text}</a>` : text; };
-const bet = o => { const h = href(o); return h ? `<a class="betbtn ${esc(o.outcome)}" href="${esc(h)}" target="_blank" rel="noopener" title="Opens this market on ${usOn ? "Polymarket US" : "Polymarket"}">Bet ${esc(o.outcome).toUpperCase()}</a>` : (usOn ? `<span class="pill gray">On Polymarket US</span>` : ""); };
+const explain = o => {
+  const out = String(o.outcome || ""), low = out.toLowerCase();
+  const p = o.now != null ? o.now : o.price, n = o.trader_count != null ? o.trader_count : o.holders;
+  const lines = [`Betting ${out.toUpperCase()} means you think ${low === "yes" ? "this happens" : low === "no" ? "this does not happen" : "“" + out + "” is the result"}.`];
+  if (p > 0 && p < 1) {
+    lines.push(`A ${out.toUpperCase()} share costs about ${cents(p)} right now. It pays $1 if you’re right and $0 if you’re wrong.`);
+    lines.push(`Example: $100 would return about $${Math.round(100 / p)} in total if you’re right (before fees), or nothing if you’re wrong.`);
+  }
+  if (n) lines.push(`${n} of ${data.trader_pool} top traders hold this side.`);
+  lines.push(`This only opens the market. Nothing is bought until you confirm there.`);
+  return lines;
+};
+const bet = o => {
+  const h = href(o);
+  if (!h) return usOn ? `<span class="pill gray">On Polymarket US</span>` : "";
+  const L = explain(o);
+  return `<span class="bw"><a class="betbtn ${esc(o.outcome)}" href="${esc(h)}" target="_blank" rel="noopener">Bet ${esc(o.outcome).toUpperCase()}</a><span class="info" tabindex="0" aria-label="What does this mean?" onclick="event.preventDefault();event.stopPropagation()">?<span class="pop" role="tooltip"><b>${esc(L[0])}</b>${L.slice(1).map(x => `<p>${esc(x)}</p>`).join("")}</span></span></span>`;
+};
 const chg = (v, i) => i ? v / i - 1 : null;
 const pct = x => `${x >= 0 ? "+" : "−"}${Math.abs(Math.round(x * 100))}%`;
 const pnlPill = x => x == null ? `<span class="pill gray">–</span>` : `<span class="pill ${x >= 0 ? "" : "down"}">${pct(x)}</span>`;
@@ -233,7 +256,7 @@ function renderSide(){
   const top = [...P].sort((a,b) => b.trader_count - a.trader_count || b.total_value - a.total_value)[0];
   $("feature").innerHTML = top ? `<div class="k">Strongest agreement right now</div><div class="n">${top.trader_count} of ${data.trader_pool}</div>
     <div class="m"><span class="side-tag ${esc(top.outcome)}">${esc(top.outcome).toUpperCase()}</span> ${lnk(top, esc(top.title))}</div>
-    <div class="f"><div>Worth now<b>${money(top.total_value)}</b></div><div>Price<b>${cents(top.price)}</b></div><div>Avg buy<b>${cents(top.avg_entry)}</b></div></div>${href(top) ? `<div style="margin-top:12px;position:relative;z-index:1"><a class="betbtn" style="background:#fff;color:#173f24" href="${esc(href(top))}" target="_blank" rel="noopener">Bet ${esc(top.outcome).toUpperCase()} on Polymarket${usOn ? " US" : ""} →</a></div>` : ""}` : "";
+    <div class="f"><div>Worth now<b>${money(top.total_value)}</b></div><div>Price<b>${cents(top.price)}</b></div><div>Avg buy<b>${cents(top.avg_entry)}</b></div></div>${href(top) ? `<div style="margin-top:12px;position:relative;z-index:1"><a class="betbtn" style="background:#fff;color:#173f24" title="${esc(explain(top).join(" "))}" href="${esc(href(top))}" target="_blank" rel="noopener">Bet ${esc(top.outcome).toUpperCase()} on Polymarket${usOn ? " US" : ""} →</a></div>` : ""}` : "";
   const counts = {}; P.forEach(p => counts[p.category] = (counts[p.category] || 0) + 1);
   const top4 = Object.keys(counts).filter(c => c !== "Other").sort((a,b) => counts[b] - counts[a]).slice(0, 4);
   $("quick").innerHTML = top4.map(c => `<button class="q" data-c="${esc(c)}"><i>${esc(c[0])}</i>${esc(c)}</button>`).join("");
