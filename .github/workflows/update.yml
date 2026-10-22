@@ -14,9 +14,10 @@ jobs:
         with:
           python-version: "3.12"
       - run: python fetch_consensus.py --top 50 --period MONTH
+      - run: python fetch_consensus.py --top 50 --period MONTH --category SPORTS --out data_sports.json --no-history
       - run: |
           git config user.name "github-actions"
           git config user.email "actions@github.com"
-          git add data.json history.json
+          git add data.json data_sports.json history.json
           git commit -m "Update data" || exit 0
           git push
