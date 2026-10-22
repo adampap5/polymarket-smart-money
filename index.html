@@ -76,10 +76,8 @@ a{color:var(--g3)}
 .usnote{font-size:11.5px;color:var(--mute);padding:4px 12px 0;line-height:1.4}.nav:disabled{opacity:.5;cursor:default}
 .bw{position:relative;display:inline-flex;align-items:center;gap:6px}
 .info{width:16px;height:16px;border-radius:50%;background:var(--soft);color:var(--mute);font-size:11px;font-weight:800;display:inline-grid;place-items:center;cursor:help;outline-offset:2px}
-.pop{display:none;position:absolute;z-index:20;top:calc(100% + 6px);right:0;width:260px;white-space:normal;background:#fff;border:1px solid var(--line);box-shadow:0 10px 28px rgba(30,60,40,.16);border-radius:12px;padding:10px 12px;font-size:12px;font-weight:500;color:var(--ink);text-align:left;line-height:1.5;cursor:default}
-.pop b{display:block;margin-bottom:4px;font-weight:700}.pop p{margin:4px 0}
-.bw:hover .pop,.bw:focus-within .pop{display:block}
-.tags .pop{left:0;right:auto}
+#tip{display:none;position:fixed;z-index:1000;width:260px;max-width:calc(100vw - 16px);background:#fff;border:1px solid var(--line);box-shadow:0 12px 32px rgba(30,60,40,.22);border-radius:12px;padding:10px 12px;font-size:12px;font-weight:500;color:var(--ink);line-height:1.5;pointer-events:none}
+#tip b{display:block;margin-bottom:4px;font-weight:700}#tip p{margin:4px 0}
 .betbtn{display:inline-block;font-size:11.5px;font-weight:700;padding:3px 11px;border-radius:99px;text-decoration:none;background:var(--gbg);color:var(--g3);white-space:nowrap}.betbtn.No{background:var(--rbg);color:var(--red)}.betbtn:hover{filter:brightness(.94);text-decoration:none}
 .feature{background:linear-gradient(145deg,#c4e3c0,#8cc48f);border-radius:20px;padding:18px;color:#143a21;position:relative;overflow:hidden;box-shadow:0 10px 24px rgba(60,130,80,.22)}
 .feature:after{content:"";position:absolute;right:-30px;top:-30px;width:130px;height:130px;border-radius:50%;background:rgba(255,255,255,.22)}
@@ -180,6 +178,7 @@ th{font-weight:600;color:var(--mute);font-size:12px;background:var(--soft)}th:fi
     <section id="traders" hidden></section>
   </section>
 </div>
+<div id="tip" role="tooltip"></div>
 <script>
 const $ = id => document.getElementById(id);
 const money = n => n == null || isNaN(n) ? "–" : n >= 1e6 ? "$" + (n/1e6).toFixed(1) + "M" : n >= 1e3 ? "$" + (n/1e3).toFixed(1) + "K" : "$" + Math.round(n);
@@ -206,7 +205,7 @@ const bet = o => {
   const h = href(o);
   if (!h) return usOn ? `<span class="pill gray">On Polymarket US</span>` : "";
   const L = explain(o);
-  return `<span class="bw"><a class="betbtn ${esc(o.outcome)}" href="${esc(h)}" target="_blank" rel="noopener">Bet ${esc(o.outcome).toUpperCase()}</a><span class="info" tabindex="0" aria-label="What does this mean?" onclick="event.preventDefault();event.stopPropagation()">?<span class="pop" role="tooltip"><b>${esc(L[0])}</b>${L.slice(1).map(x => `<p>${esc(x)}</p>`).join("")}</span></span></span>`;
+  return `<span class="bw" data-tip="${esc(L.join("\n"))}"><a class="betbtn ${esc(o.outcome)}" href="${esc(h)}" target="_blank" rel="noopener">Bet ${esc(o.outcome).toUpperCase()}</a><span class="info" tabindex="0" aria-label="What does this mean?">?</span></span>`;
 };
 const chg = (v, i) => i ? v / i - 1 : null;
 const pct = x => `${x >= 0 ? "+" : "−"}${Math.abs(Math.round(x * 100))}%`;
@@ -344,6 +343,32 @@ function show(tab){
   ["m","f","t"].forEach(k => $("t-" + k).setAttribute("aria-selected", tab === k));
   $("title").textContent = TITLES[tab];
 }
+
+const tipEl = $("tip");
+function hideTip(){ tipEl.style.display = "none"; tipEl._for = null; }
+function showTip(b){
+  const L = (b.dataset.tip || "").split("\n");
+  if (!L[0]) return;
+  tipEl.innerHTML = `<b>${esc(L[0])}</b>` + L.slice(1).map(x => `<p>${esc(x)}</p>`).join("");
+  tipEl.style.display = "block"; tipEl._for = b;
+  const r = b.getBoundingClientRect(), w = tipEl.offsetWidth, hgt = tipEl.offsetHeight, vw = window.innerWidth, vh = window.innerHeight;
+  let top = r.bottom + 8;
+  if (top + hgt > vh - 8) top = r.top - hgt - 8;
+  if (top < 8) top = Math.max(8, vh - hgt - 8);
+  tipEl.style.top = top + "px";
+  tipEl.style.left = Math.min(Math.max(8, r.left), Math.max(8, vw - w - 8)) + "px";
+}
+const bwOf = e => e.target && e.target.closest ? e.target.closest(".bw") : null;
+document.addEventListener("mouseover", e => { const b = bwOf(e); if (b) showTip(b); });
+document.addEventListener("mouseout", e => { const b = bwOf(e); if (b && !(e.relatedTarget && b.contains(e.relatedTarget))) hideTip(); });
+document.addEventListener("focusin", e => { const b = bwOf(e); if (b) showTip(b); });
+document.addEventListener("focusout", hideTip);
+document.addEventListener("click", e => {
+  const i = e.target && e.target.closest ? e.target.closest(".info") : null;
+  if (i) { e.preventDefault(); const b = i.closest(".bw"); tipEl._for === b ? hideTip() : showTip(b); }
+  else if (!bwOf(e)) hideTip();
+});
+window.addEventListener("scroll", hideTip, true);
 
 function renderUs(){
   const u = raw.us, can = !!(u && u.ok && u.matched > 0);
