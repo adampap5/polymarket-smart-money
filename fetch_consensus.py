@@ -87,7 +87,7 @@ def recent_buys(wallet, name, hours, typical):
         usd = float(a.get("usdcSize") or 0) or float(a.get("size") or 0) * float(a.get("price") or 0)
         k = (a.get("conditionId"), a.get("outcome"))
         m = merged.setdefault(k, {"usd": 0.0, "shares": 0.0, "n": 0, "ts": 0,
-                                  "title": a.get("title"), "slug": a.get("slug")})
+                                  "title": a.get("title"), "slug": a.get("slug"), "event_slug": a.get("eventSlug")})
         m["usd"] += usd
         m["shares"] += float(a.get("size") or 0)
         m["n"] += 1
@@ -98,12 +98,64 @@ def recent_buys(wallet, name, hours, typical):
             continue
         out.append({
             "wallet": wallet, "name": name, "conditionId": cond, "outcome": outcome,
-            "title": m["title"], "slug": m["slug"], "usd": round(m["usd"]), "n": m["n"], "ts": m["ts"],
+            "title": m["title"], "slug": m["slug"], "event_slug": m.get("event_slug"), "usd": round(m["usd"]), "n": m["n"], "ts": m["ts"],
             "price": round(m["usd"] / m["shares"], 3) if m["shares"] else None,
             "typical": round(typical),
             "big": bool(typical and m["usd"] >= 3 * typical and m["usd"] >= 500),
         })
     return out
+
+
+US_GATEWAY = "https://gateway.polymarket.us/v1/markets"
+
+
+def norm(text):
+    return re.sub(r"[^a-z0-9]+", " ", (text or "").lower()).strip()
+
+
+def fetch_us_markets(page=200, max_pages=60):
+    """Open markets on Polymarket US. Public endpoint, no login. Returns (markets, ok)."""
+    markets = []
+    for i in range(max_pages):
+        qs = urllib.parse.urlencode({"limit": page, "offset": i * page, "active": "true", "closed": "false"})
+        req = urllib.request.Request(f"{US_GATEWAY}?{qs}", headers={"User-Agent": "consensus-dashboard/0.3"})
+        batch = None
+        for attempt in range(3):
+            try:
+                with urllib.request.urlopen(req, timeout=30) as r:
+                    batch = json.load(r).get("markets") or []
+                break
+            except Exception as e:
+                if attempt == 2:
+                    print(f"  Polymarket US market list failed at offset {i * page}: {e}")
+                    return markets, False
+                time.sleep(1.5 * (attempt + 1))
+        markets += batch
+        if len(batch) < page:
+            break
+    return markets, True
+
+
+def us_index(markets):
+    slugs, titles = {}, {}
+    for m in markets:
+        slug = m.get("slug")
+        if slug:
+            slugs[slug] = slug
+        for key in ("question", "title"):
+            t = norm(m.get(key))
+            if t and slug:
+                titles.setdefault(t, slug)
+    return slugs, titles
+
+
+def us_match(idx, slug, event_slug, title):
+    """Return the Polymarket US slug for this market, or None. Matches by slug, then by exact wording."""
+    slugs, titles = idx
+    for s in (slug, event_slug):
+        if s and s in slugs:
+            return slugs[s]
+    return titles.get(norm(title))
 
 
 def win_rate(wallet):
@@ -145,6 +197,7 @@ def main():
     ap.add_argument("--out", default="data.json")
     ap.add_argument("--recent-hours", type=int, default=48)
     ap.add_argument("--no-history", action="store_true")
+    ap.add_argument("--no-us", action="store_true", help="skip the Polymarket US market list")
     args = ap.parse_args()
 
     leaders = get("/v1/leaderboard", category=args.category, timePeriod=args.period,
@@ -153,6 +206,9 @@ def main():
 
     groups = defaultdict(lambda: {"traders": [], "value": 0.0, "invested": 0.0, "cost": 0.0, "shares": 0.0})
     trader_rows = []
+    us_markets, us_ok = ([], False) if args.no_us else fetch_us_markets()
+    us_idx = us_index(us_markets)
+    print(f"Polymarket US: {len(us_markets)} open markets (ok={us_ok})")
     recent = []
     for i, t in enumerate(leaders, 1):
         wallet = t["proxyWallet"]
@@ -177,7 +233,7 @@ def main():
             if value < args.min_value:
                 continue
             g = groups[(p["conditionId"], p["outcome"])]
-            g.update(title=p.get("title"), slug=p.get("slug"), outcome=p["outcome"],
+            g.update(title=p.get("title"), slug=p.get("slug"), event_slug=p.get("eventSlug"), outcome=p["outcome"],
                      price=p.get("curPrice"), end=p.get("endDate"))
             g["traders"].append({"name": name, "wallet": wallet, "value": round(value, 2)})
             g["value"] += value
@@ -189,7 +245,7 @@ def main():
     rows = []
     for (cond, _), g in groups.items():
         rows.append({
-            "conditionId": cond, "title": g["title"], "slug": g["slug"],
+            "conditionId": cond, "title": g["title"], "slug": g["slug"], "event_slug": g.get("event_slug"),
             "outcome": g["outcome"], "price": g["price"], "end": g["end"],
             "category": classify(g["title"]),
             "league": None,
@@ -202,19 +258,28 @@ def main():
     for r in rows:
         if r["category"] == "Sports":
             r["league"] = classify_league(r["title"]) or "Other sports"
+    for r in rows:
+        m = us_match(us_idx, r["slug"], r.get("event_slug"), r["title"]) if us_ok else None
+        r["us"] = bool(m) if us_ok else None
+        r["us_slug"] = m
     rows.sort(key=lambda r: (-r["trader_count"], -r["total_value"]))
     held = {(r["conditionId"], r["outcome"]): r for r in rows}
     for b in recent:
         g = held.get((b["conditionId"], b["outcome"]))
         b["holders"] = g["trader_count"] if g else None
         b["now"] = g["price"] if g else None
+        m = us_match(us_idx, b["slug"], b.get("event_slug"), b["title"]) if us_ok else None
+        b["us"] = bool(m) if us_ok else None
+        b["us_slug"] = m
         b["category"] = classify(b["title"])
         b["league"] = (classify_league(b["title"]) or "Other sports") if b["category"] == "Sports" else None
     recent.sort(key=lambda b: -b["ts"])
 
     out = {"generated_at": datetime.now(timezone.utc).isoformat(),
            "trader_pool": len(leaders), "period": args.period, "category": args.category,
-           "traders": trader_rows, "positions": rows, "recent": recent[:400]}
+           "traders": trader_rows, "positions": rows, "recent": recent[:400],
+           "us": {"ok": bool(us_ok and us_markets), "markets": len(us_markets),
+                  "matched": sum(1 for r in rows if r.get("us")), "total": len(rows)}}
     with open(args.out, "w") as f:
         json.dump(out, f)
     if not args.no_history:

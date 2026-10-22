@@ -61,7 +61,7 @@ body{margin:0;min-height:100vh;color:var(--ink);font:500 14px/1.45 "Plus Jakarta
 .ctl label span{display:flex;gap:8px;align-items:center;color:var(--ink);font-size:13px;height:32px}
 select,input[type=text]{font:inherit;font-size:13px;height:32px;padding:0 10px;border:1px solid var(--line);border-radius:9px;background:#fff;color:var(--ink)}
 input[type=range]{accent-color:var(--g3)}
-.mhead,.mrow summary{display:grid;grid-template-columns:minmax(0,1fr) 150px 120px 90px 84px;gap:14px;align-items:center;padding:12px 10px}
+.mhead,.mrow summary{display:grid;grid-template-columns:minmax(0,1fr) 150px 120px 90px 110px;gap:14px;align-items:center;padding:12px 10px}
 .mhead{color:var(--mute);font-size:12px;font-weight:600;background:var(--soft);border-radius:10px;margin-top:10px}
 .mrow{border-bottom:1px solid var(--line)}.mrow:last-child{border-bottom:0}
 .mrow summary{list-style:none;cursor:pointer;border-radius:10px}.mrow summary::-webkit-details-marker{display:none}.mrow summary:hover,.mrow[open] summary{background:#f8fbf7}
@@ -73,6 +73,8 @@ input[type=range]{accent-color:var(--g3)}
 .detail{padding:6px 12px 14px;background:#f8fbf7;border-radius:0 0 10px 10px}.detail h3{margin:8px 0 6px;font-size:12px;color:var(--mute);font-weight:600}
 .holders{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:2px 26px}.holders div{display:flex;justify-content:space-between;padding:2px 0}
 a{color:var(--g3)}
+.usnote{font-size:11.5px;color:var(--mute);padding:4px 12px 0;line-height:1.4}.nav:disabled{opacity:.5;cursor:default}
+.betbtn{display:inline-block;font-size:11.5px;font-weight:700;padding:3px 11px;border-radius:99px;text-decoration:none;background:var(--gbg);color:var(--g3);white-space:nowrap}.betbtn.No{background:var(--rbg);color:var(--red)}.betbtn:hover{filter:brightness(.94);text-decoration:none}
 .feature{background:linear-gradient(145deg,#c4e3c0,#8cc48f);border-radius:20px;padding:18px;color:#143a21;position:relative;overflow:hidden;box-shadow:0 10px 24px rgba(60,130,80,.22)}
 .feature:after{content:"";position:absolute;right:-30px;top:-30px;width:130px;height:130px;border-radius:50%;background:rgba(255,255,255,.22)}
 .feature .k{font-size:12px;font-weight:700;opacity:.8}.feature .n{font-size:34px;font-weight:800;letter-spacing:-.03em;margin:4px 0}
@@ -110,11 +112,14 @@ th{font-weight:600;color:var(--mute);font-size:12px;background:var(--soft)}th:fi
     <button class="nav" id="t-t" aria-selected="false"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c0-3.6 2.9-6 6.5-6s6.5 2.4 6.5 6M16 4.5a3.5 3.5 0 0 1 0 7M18 14c2.2.6 3.5 2.4 3.5 5"/></svg>Top traders</button>
     <div class="sect">Whose bets</div>
     <div id="src"></div>
+    <div class="sect">Where you can bet</div>
+    <div id="us"></div>
     <details class="promo"><summary>How to read this</summary><ul>
       <li>Each row is <b>one side of one market</b>. YES means they bet it happens, NO means they don’t.</li>
       <li><b>Top traders</b> is how many tracked earners hold that side.</li>
       <li><b>Worth now</b> is today’s value. The percentage compares it to what they put in.</li>
       <li><b>Price</b> is in cents: 55¢ means roughly a 55% chance. Click a row to see who holds it.</li>
+      <li>The <b>Bet</b> buttons open that market on Polymarket. You place the bet there with your own account.</li>
     </ul></details>
   </aside>
 
@@ -176,11 +181,15 @@ const cents = p => p == null ? "–" : Math.round(p * 100) + "¢";
 const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 const daysLeft = e => e ? (new Date(e + (e.length <= 10 ? "T23:59:59Z" : "")) - Date.now()) / 864e5 : null;
 const ago = ts => { const m = (Date.now()/1000 - ts) / 60; return m < 60 ? Math.max(1, Math.round(m)) + "m ago" : m < 1440 ? Math.round(m/60) + "h ago" : Math.round(m/1440) + "d ago"; };
+const US_MARKET_URL = null; // page address for one Polymarket US market, ending right before the market name
+const href = o => usOn ? (US_MARKET_URL && o.us_slug ? US_MARKET_URL + o.us_slug : null) : "https://polymarket.com/event/" + (o.event_slug || o.slug || "");
+const lnk = (o, text) => { const h = href(o); return h ? `<a href="${esc(h)}" target="_blank" rel="noopener">${text}</a>` : text; };
+const bet = o => { const h = href(o); return h ? `<a class="betbtn ${esc(o.outcome)}" href="${esc(h)}" target="_blank" rel="noopener" title="Opens this market on ${usOn ? "Polymarket US" : "Polymarket"}">Bet ${esc(o.outcome).toUpperCase()}</a>` : (usOn ? `<span class="pill gray">On Polymarket US</span>` : ""); };
 const chg = (v, i) => i ? v / i - 1 : null;
 const pct = x => `${x >= 0 ? "+" : "−"}${Math.abs(Math.round(x * 100))}%`;
 const pnlPill = x => x == null ? `<span class="pill gray">–</span>` : `<span class="pill ${x >= 0 ? "" : "down"}">${pct(x)}</span>`;
 const niceMax = m => { if (!(m > 0)) return 1; const mag = 10 ** Math.floor(Math.log10(m)); return [1,2,2.5,5,10].map(k => k * mag).find(v => v >= m); };
-let data, cat = "All", league = "All", file = "data.json"; const cache = {};
+let data, raw, usOn = false, cat = "All", league = "All", file = "data.json"; const cache = {};
 const SRC = [["data.json","Top overall earners"],["data_sports.json","Top sports earners"]];
 const TITLES = {m: "Markets", f: "New bets", t: "Top traders"};
 
@@ -223,8 +232,8 @@ function renderSide(){
   const P = data.positions;
   const top = [...P].sort((a,b) => b.trader_count - a.trader_count || b.total_value - a.total_value)[0];
   $("feature").innerHTML = top ? `<div class="k">Strongest agreement right now</div><div class="n">${top.trader_count} of ${data.trader_pool}</div>
-    <div class="m"><span class="side-tag ${esc(top.outcome)}">${esc(top.outcome).toUpperCase()}</span> <a href="https://polymarket.com/event/${esc(top.slug)}" target="_blank" rel="noopener">${esc(top.title)}</a></div>
-    <div class="f"><div>Worth now<b>${money(top.total_value)}</b></div><div>Price<b>${cents(top.price)}</b></div><div>Avg buy<b>${cents(top.avg_entry)}</b></div></div>` : "";
+    <div class="m"><span class="side-tag ${esc(top.outcome)}">${esc(top.outcome).toUpperCase()}</span> ${lnk(top, esc(top.title))}</div>
+    <div class="f"><div>Worth now<b>${money(top.total_value)}</b></div><div>Price<b>${cents(top.price)}</b></div><div>Avg buy<b>${cents(top.avg_entry)}</b></div></div>${href(top) ? `<div style="margin-top:12px;position:relative;z-index:1"><a class="betbtn" style="background:#fff;color:#173f24" href="${esc(href(top))}" target="_blank" rel="noopener">Bet ${esc(top.outcome).toUpperCase()} on Polymarket${usOn ? " US" : ""} →</a></div>` : ""}` : "";
   const counts = {}; P.forEach(p => counts[p.category] = (counts[p.category] || 0) + 1);
   const top4 = Object.keys(counts).filter(c => c !== "Other").sort((a,b) => counts[b] - counts[a]).slice(0, 4);
   $("quick").innerHTML = top4.map(c => `<button class="q" data-c="${esc(c)}"><i>${esc(c[0])}</i>${esc(c)}</button>`).join("");
@@ -271,12 +280,12 @@ function render(){
     const d = daysLeft(r.end);
     const when = d == null ? "" : d < 0 ? "Closed" : d < 1 ? "Closes today" : `Closes in ${Math.ceil(d)}d`;
     return `<details class="mrow"><summary>
-      <div><div class="t"><span class="side-tag ${esc(r.outcome)}">${esc(r.outcome).toUpperCase()}</span><a href="https://polymarket.com/event/${esc(r.slug)}" target="_blank" rel="noopener">${esc(r.title)}</a></div>
-        <div class="tags"><span class="tag">${esc(r.category)}${r.league ? " · " + esc(r.league) : ""}</span>${when ? `<span class="tag ${d != null && d >= 0 && d <= 7 ? "soon" : ""}">${when}</span>` : ""}</div></div>
+      <div><div class="t"><span class="side-tag ${esc(r.outcome)}">${esc(r.outcome).toUpperCase()}</span>${lnk(r, esc(r.title))}</div>
+        <div class="tags"><span class="tag">${esc(r.category)}${r.league ? " · " + esc(r.league) : ""}</span>${r.us ? '<span class="pill">On Polymarket US</span>' : ""}${when ? `<span class="tag ${d != null && d >= 0 && d <= 7 ? "soon" : ""}">${when}</span>` : ""}</div></div>
       <div><span class="lbl">Top traders</span><div class="agree"><div class="meter"><i style="width:${r.trader_count / data.trader_pool * 100}%"></i></div><b>${r.trader_count}</b><span>/${data.trader_pool}</span></div></div>
       <div class="cell"><span class="lbl">Worth now</span><b>${money(r.total_value)}</b><small>${r.invested ? "from " + money(r.invested) : ""}</small></div>
       <div class="cell"><span class="lbl">Price</span><b>${cents(r.price)}</b><small>avg buy ${cents(r.avg_entry)}</small></div>
-      <div><span class="lbl">Up / down</span>${pnlPill(chg(r.total_value, r.invested))}</div>
+      <div><span class="lbl">Up / down</span>${pnlPill(chg(r.total_value, r.invested))}<div style="margin-top:6px">${bet(r)}</div></div>
     </summary><div class="detail"><h3>Top traders holding this</h3><div class="holders">${r.traders.map(t => `<div><a href="https://polymarket.com/profile/${esc(t.wallet)}" target="_blank" rel="noopener">${esc(t.name)}</a><span>${money(t.value)}</span></div>`).join("")}</div></div></details>`;
   }).join("") : '<div class="empty">No markets match these filters. Try lowering the minimum number of traders.</div>';
 }
@@ -287,9 +296,9 @@ function renderFeed(){
   const items = (data.recent || []).filter(b => b.ts >= cutoff && b.usd >= min && (c === "All" || b.category === c) && (!big || b.big));
   $("feedlist").innerHTML = items.length ? items.map(b => `<div class="item">
     <div class="when">${ago(b.ts)}</div>
-    <div class="what"><a href="https://polymarket.com/profile/${esc(b.wallet)}" target="_blank" rel="noopener">${esc(b.name)}</a> bought <span class="side-tag ${esc(b.outcome)}">${esc(b.outcome).toUpperCase()}</span> on <a href="https://polymarket.com/event/${esc(b.slug)}" target="_blank" rel="noopener">${esc(b.title)}</a></div>
+    <div class="what"><a href="https://polymarket.com/profile/${esc(b.wallet)}" target="_blank" rel="noopener">${esc(b.name)}</a> bought <span class="side-tag ${esc(b.outcome)}">${esc(b.outcome).toUpperCase()}</span> on ${lnk(b, esc(b.title))}</div>
     <div class="amt">${money(b.usd)}<small>${b.price != null ? "at " + cents(b.price) : ""}${b.n > 1 ? " · " + b.n + " buys" : ""}</small></div>
-    <div class="tags"><span class="tag">${esc(b.category)}${b.league ? " · " + esc(b.league) : ""}</span>
+    <div class="tags">${bet(b)}<span class="tag">${esc(b.category)}${b.league ? " · " + esc(b.league) : ""}</span>
       ${b.big ? `<span class="pill big">Big bet · ${Math.round(b.usd / b.typical)}× their usual</span>` : ""}
       ${b.holders ? `<span class="tag">${b.holders} top trader${b.holders > 1 ? "s" : ""} hold this now</span>` : ""}
       ${b.now != null ? `<span class="tag">Price now ${cents(b.now)}</span>` : ""}</div>
@@ -313,14 +322,29 @@ function show(tab){
   $("title").textContent = TITLES[tab];
 }
 
+function renderUs(){
+  const u = raw.us, can = !!(u && u.ok && u.matched > 0);
+  $("us").innerHTML = `<button class="nav" id="usbtn" aria-pressed="${usOn}" ${can ? "" : "disabled"}>Polymarket US only</button><div class="usnote">${
+    !u ? "Run the Update data job to load the US market list." : !u.ok ? "The US market list couldn’t be loaded in the last update." :
+    u.matched === 0 ? `None of ${u.total} positions matched the ${u.markets} US markets, so this filter is off.` :
+    `${u.matched} of ${u.total} positions matched to ${u.markets} open US markets.`}</div>`;
+  const b = $("usbtn"); if (b) b.onclick = () => { usOn = !usOn; apply(); };
+}
+function apply(){
+  const d = raw;
+  data = usOn ? {...d, positions: d.positions.filter(p => p.us), recent: (d.recent || []).filter(b => b.us)} : d;
+  const max = Math.max(1, ...data.positions.map(p => p.trader_count));
+  $("min").max = max; $("min").value = Math.min(3, max);
+  $("meta").textContent = `Tracking the top ${d.trader_pool} ${file.includes("sports") ? "sports " : ""}earners of the past ${d.period.toLowerCase()} · Updated ${new Date(d.generated_at).toLocaleString()}`;
+  renderUs(); renderCards(); renderSide(); renderChips(); renderLeagues(); render(); renderTraders(); renderFeedFilters(); renderFeed();
+}
+
 function load(f){
   file = f; renderSrc();
   const go = d => {
-    cache[f] = d; data = d; cat = f.includes("sports") ? "Sports" : "All"; league = "All";
-    const max = Math.max(1, ...d.positions.map(p => p.trader_count));
-    $("min").max = max; $("min").value = Math.min(3, max);
-    $("meta").textContent = `Tracking the top ${d.trader_pool} ${f.includes("sports") ? "sports " : ""}earners of the past ${d.period.toLowerCase()} · Updated ${new Date(d.generated_at).toLocaleString()}`;
-    renderCards(); renderSide(); renderChips(); renderLeagues(); render(); renderTraders(); renderFeedFilters(); renderFeed();
+    cache[f] = d; raw = d; cat = f.includes("sports") ? "Sports" : "All"; league = "All";
+    usOn = !!(d.us && d.us.ok && d.us.matched > 0);
+    apply();
   };
   if (cache[f]) return go(cache[f]);
   fetch(f).then(r => { if (!r.ok) throw 0; return r.json(); }).then(go)
