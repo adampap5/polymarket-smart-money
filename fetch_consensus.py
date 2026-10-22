@@ -106,56 +106,71 @@ def recent_buys(wallet, name, hours, typical):
     return out
 
 
-US_GATEWAY = "https://gateway.polymarket.us/v1/markets"
+US_GATEWAY = "https://gateway.polymarket.us/v1/events"
 
 
 def norm(text):
     return re.sub(r"[^a-z0-9]+", " ", (text or "").lower()).strip()
 
 
-def fetch_us_markets(page=200, max_pages=60):
-    """Open markets on Polymarket US. Public endpoint, no login. Returns (markets, ok)."""
-    markets = []
+def fetch_us_events(page=100, max_pages=60):
+    """Open events (games, questions) on Polymarket US with their markets. Public, no login. Returns (events, ok)."""
+    events = []
     for i in range(max_pages):
         qs = urllib.parse.urlencode({"limit": page, "offset": i * page, "active": "true", "closed": "false"})
-        req = urllib.request.Request(f"{US_GATEWAY}?{qs}", headers={"User-Agent": "consensus-dashboard/0.3"})
+        req = urllib.request.Request(f"{US_GATEWAY}?{qs}", headers={"User-Agent": "consensus-dashboard/0.4"})
         batch = None
         for attempt in range(3):
             try:
-                with urllib.request.urlopen(req, timeout=30) as r:
-                    batch = json.load(r).get("markets") or []
+                with urllib.request.urlopen(req, timeout=60) as r:
+                    batch = json.load(r).get("events") or []
                 break
             except Exception as e:
                 if attempt == 2:
-                    print(f"  Polymarket US market list failed at offset {i * page}: {e}")
-                    return markets, False
+                    print(f"  Polymarket US event list failed at offset {i * page}: {e}")
+                    return events, False
                 time.sleep(1.5 * (attempt + 1))
-        markets += batch
+        events += batch
         if len(batch) < page:
             break
-    return markets, True
+    return events, True
 
 
-def us_index(markets):
-    slugs, titles = {}, {}
-    for m in markets:
-        slug = m.get("slug")
-        if slug:
-            slugs[slug] = slug
-        for key in ("question", "title"):
-            t = norm(m.get(key))
-            if t and slug:
-                titles.setdefault(t, slug)
-    return slugs, titles
+def us_path(ev):
+    """Page path on polymarket.us. Confirmed only for sports games: /sports/<league>/<game-slug>."""
+    slug = ev.get("slug")
+    if slug and ev.get("gameId"):
+        return f"/sports/{slug.split('-')[0]}/{slug}"
+    return None
+
+
+def us_index(events):
+    by_slug, by_title = {}, {}
+    for ev in events:
+        path = us_path(ev)
+        hit = {"slug": ev.get("slug"), "path": path}
+        if ev.get("slug"):
+            by_slug[ev["slug"]] = hit
+        t = norm(ev.get("title"))
+        if t:
+            by_title.setdefault(t, hit)
+        for m in ev.get("markets") or []:
+            mhit = {"slug": m.get("slug") or ev.get("slug"), "path": path}
+            if m.get("slug"):
+                by_slug[m["slug"]] = mhit
+            t = norm(m.get("question"))
+            if t:
+                by_title.setdefault(t, mhit)
+    return by_slug, by_title
 
 
 def us_match(idx, slug, event_slug, title):
-    """Return the Polymarket US slug for this market, or None. Matches by slug, then by exact wording."""
-    slugs, titles = idx
+    """Return {"slug", "path"} for the matching Polymarket US market, or None. Matches by slug, then exact wording."""
+    by_slug, by_title = idx
     for s in (slug, event_slug):
-        if s and s in slugs:
-            return slugs[s]
-    return titles.get(norm(title))
+        if s and s in by_slug:
+            return by_slug[s]
+    return by_title.get(norm(title))
 
 
 def win_rate(wallet):
@@ -206,9 +221,10 @@ def main():
 
     groups = defaultdict(lambda: {"traders": [], "value": 0.0, "invested": 0.0, "cost": 0.0, "shares": 0.0})
     trader_rows = []
-    us_markets, us_ok = ([], False) if args.no_us else fetch_us_markets()
-    us_idx = us_index(us_markets)
-    print(f"Polymarket US: {len(us_markets)} open markets (ok={us_ok})")
+    us_events, us_ok = ([], False) if args.no_us else fetch_us_events()
+    us_idx = us_index(us_events)
+    us_count = sum(len(e.get("markets") or []) for e in us_events)
+    print(f"Polymarket US: {len(us_events)} open events, {us_count} markets (ok={us_ok})")
     recent = []
     for i, t in enumerate(leaders, 1):
         wallet = t["proxyWallet"]
@@ -261,7 +277,8 @@ def main():
     for r in rows:
         m = us_match(us_idx, r["slug"], r.get("event_slug"), r["title"]) if us_ok else None
         r["us"] = bool(m) if us_ok else None
-        r["us_slug"] = m
+        r["us_slug"] = m["slug"] if m else None
+        r["us_path"] = m["path"] if m else None
     rows.sort(key=lambda r: (-r["trader_count"], -r["total_value"]))
     held = {(r["conditionId"], r["outcome"]): r for r in rows}
     for b in recent:
@@ -270,7 +287,8 @@ def main():
         b["now"] = g["price"] if g else None
         m = us_match(us_idx, b["slug"], b.get("event_slug"), b["title"]) if us_ok else None
         b["us"] = bool(m) if us_ok else None
-        b["us_slug"] = m
+        b["us_slug"] = m["slug"] if m else None
+        b["us_path"] = m["path"] if m else None
         b["category"] = classify(b["title"])
         b["league"] = (classify_league(b["title"]) or "Other sports") if b["category"] == "Sports" else None
     recent.sort(key=lambda b: -b["ts"])
@@ -278,7 +296,7 @@ def main():
     out = {"generated_at": datetime.now(timezone.utc).isoformat(),
            "trader_pool": len(leaders), "period": args.period, "category": args.category,
            "traders": trader_rows, "positions": rows, "recent": recent[:400],
-           "us": {"ok": bool(us_ok and us_markets), "markets": len(us_markets),
+           "us": {"ok": bool(us_ok and us_events), "markets": us_count,
                   "matched": sum(1 for r in rows if r.get("us")), "total": len(rows)}}
     with open(args.out, "w") as f:
         json.dump(out, f)

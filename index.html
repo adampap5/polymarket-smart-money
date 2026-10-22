@@ -187,8 +187,8 @@ const cents = p => p == null ? "–" : Math.round(p * 100) + "¢";
 const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 const daysLeft = e => e ? (new Date(e + (e.length <= 10 ? "T23:59:59Z" : "")) - Date.now()) / 864e5 : null;
 const ago = ts => { const m = (Date.now()/1000 - ts) / 60; return m < 60 ? Math.max(1, Math.round(m)) + "m ago" : m < 1440 ? Math.round(m/60) + "h ago" : Math.round(m/1440) + "d ago"; };
-const US_MARKET_URL = null; // page address for one Polymarket US market, ending right before the market name
-const href = o => usOn ? (US_MARKET_URL && o.us_slug ? US_MARKET_URL + o.us_slug : null) : "https://polymarket.com/event/" + (o.event_slug || o.slug || "");
+const US_BASE = "https://polymarket.us";
+const href = o => usOn ? (o.us_path ? US_BASE + o.us_path : null) : "https://polymarket.com/event/" + (o.event_slug || o.slug || "");
 const lnk = (o, text) => { const h = href(o); return h ? `<a href="${esc(h)}" target="_blank" rel="noopener">${text}</a>` : text; };
 const explain = o => {
   const out = String(o.outcome || ""), low = out.toLowerCase();
