@@ -77,7 +77,9 @@ th{font-weight:600;color:var(--mute);font-size:12px;background:var(--panel2)}th:
       <li>Click a card to see which traders hold it and how much each has in.</li>
     </ul></details>
     <div class="bar">
+      <div class="chips" id="src"></div>
       <div class="chips" id="chips"></div>
+      <div class="chips" id="leagues" hidden></div>
       <div class="ctl">
         <label>Minimum traders on one side<span><input type="range" id="min" min="1" max="20" value="3"> <b id="minv">3</b></span></label>
         <label>Market closes within<select id="end"><option value="0">Any time</option><option value="1">24 hours</option><option value="7">7 days</option><option value="30">30 days</option></select></label>
@@ -97,14 +99,28 @@ const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;
 const daysLeft = e => e ? (new Date(e + (e.length <= 10 ? "T23:59:59Z" : "")) - Date.now()) / 864e5 : null;
 const pnl = r => { if (!r.invested) return ""; const x = r.total_value / r.invested - 1;
   return `<em class="${x >= 0 ? "up" : "down"}">${x >= 0 ? "+" : "−"}${Math.abs(Math.round(x * 100))}%</em>`; };
-let data, cat = "All";
+let data, cat = "All", league = "All", file = "data.json"; const cache = {};
+const SRC = [["data.json","Top overall earners"],["data_sports.json","Top sports earners"]];
 
 function renderChips(){
   const counts = {All: data.positions.length};
   data.positions.forEach(p => counts[p.category] = (counts[p.category] || 0) + 1);
   $("chips").innerHTML = Object.keys(counts).map(c =>
     `<button class="chip" aria-pressed="${c === cat}" data-c="${esc(c)}">${esc(c)} · ${counts[c]}</button>`).join("");
-  $("chips").querySelectorAll("button").forEach(b => b.onclick = () => { cat = b.dataset.c; renderChips(); render(); });
+  $("chips").querySelectorAll("button").forEach(b => b.onclick = () => { cat = b.dataset.c; league = "All"; renderChips(); renderLeagues(); render(); });
+}
+function renderSrc(){
+  $("src").innerHTML = SRC.map(([f,l]) => `<button class="chip" aria-pressed="${f === file}" data-f="${f}">${l}</button>`).join("");
+  $("src").querySelectorAll("button").forEach(b => b.onclick = () => load(b.dataset.f));
+}
+function renderLeagues(){
+  const box = $("leagues"); box.hidden = cat !== "Sports";
+  if (box.hidden) return;
+  const counts = {};
+  data.positions.filter(p => p.category === "Sports").forEach(p => counts[p.league] = (counts[p.league] || 0) + 1);
+  const names = ["All", ...Object.keys(counts).sort((a,b) => counts[b] - counts[a])];
+  box.innerHTML = names.map(n => `<button class="chip" aria-pressed="${n === league}" data-l="${esc(n)}">${esc(n)}${n === "All" ? "" : " · " + counts[n]}</button>`).join("");
+  box.querySelectorAll("button").forEach(b => b.onclick = () => { league = b.dataset.l; renderLeagues(); render(); });
 }
 
 function render(){
@@ -112,7 +128,7 @@ function render(){
   $("minv").textContent = min;
   const rows = data.positions.filter(r => {
     const d = daysLeft(r.end);
-    return r.trader_count >= min && (cat === "All" || r.category === cat) &&
+    return r.trader_count >= min && (cat === "All" || r.category === cat) && (cat !== "Sports" || league === "All" || r.league === league) &&
       (r.title || "").toLowerCase().includes(q) && (!within || (d != null && d >= 0 && d <= within));
   }).sort((a,b) => by === "value" ? b.total_value - a.total_value
     : by === "end" ? (daysLeft(a.end) ?? 1e9) - (daysLeft(b.end) ?? 1e9)
@@ -149,15 +165,22 @@ function show(tab){
   $("t-m").setAttribute("aria-selected", tab === "m"); $("t-t").setAttribute("aria-selected", tab === "t");
 }
 
-fetch("data.json").then(r => r.json()).then(d => {
-  data = d;
-  const max = Math.max(1, ...d.positions.map(p => p.trader_count));
-  $("min").max = max; $("min").value = Math.min(3, max);
-  $("meta").textContent = `Tracking the top ${d.trader_pool} earners of the past ${d.period.toLowerCase()} · Updated ${new Date(d.generated_at).toLocaleString()}`;
-  ["min","sort","q","end"].forEach(id => $(id).addEventListener("input", render));
-  $("t-m").onclick = () => show("m"); $("t-t").onclick = () => show("t");
-  renderChips(); render(); renderTraders();
-}).catch(() => { $("meta").textContent = "Couldn’t load data.json. Check that the Update data job has run."; });
+function load(f){
+  file = f; renderSrc();
+  const go = d => {
+    cache[f] = d; data = d; cat = f.includes("sports") ? "Sports" : "All"; league = "All";
+    const max = Math.max(1, ...d.positions.map(p => p.trader_count));
+    $("min").max = max; $("min").value = Math.min(3, max);
+    $("meta").textContent = `Tracking the top ${d.trader_pool} ${f.includes("sports") ? "sports " : ""}earners of the past ${d.period.toLowerCase()} · Updated ${new Date(d.generated_at).toLocaleString()}`;
+    renderChips(); renderLeagues(); render(); renderTraders();
+  };
+  if (cache[f]) return go(cache[f]);
+  fetch(f).then(r => { if (!r.ok) throw 0; return r.json(); }).then(go)
+    .catch(() => { $("meta").textContent = f.includes("sports") ? "Sports data isn’t ready yet. Run the Update data job once." : "Couldn’t load data.json. Check that the Update data job has run."; });
+}
+["min","sort","q","end"].forEach(id => $(id).addEventListener("input", render));
+$("t-m").onclick = () => show("m"); $("t-t").onclick = () => show("t");
+load("data.json");
 </script>
 </body>
 </html>

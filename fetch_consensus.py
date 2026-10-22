@@ -3,7 +3,7 @@
 Usage: python fetch_consensus.py [--top 50] [--period MONTH] [--category OVERALL]
 Standard library only. Uses Polymarket's public Data API (no key needed).
 """
-import argparse, json, os, time, urllib.parse, urllib.request
+import argparse, json, os, re, time, urllib.parse, urllib.request
 from collections import defaultdict
 from datetime import datetime, timezone
 
@@ -19,12 +19,41 @@ CATEGORIES = [
 ]
 
 
+# Sports leagues. Pass 1 looks for league words, pass 2 for team nicknames.
+# Shared nicknames (Giants, Panthers, Jets, Kings...) go to the first league listed, so a few are guesses.
+LEAGUE_WORDS = [
+    ("College", r"ncaa|college football|college basketball|march madness|cfp|ncaaf|ncaab"),
+    ("MMA", r"ufc|mma|fight night|bellator"),
+    ("Tennis", r"tennis|atp|wta|wimbledon|us open|french open|australian open|roland garros"),
+    ("Soccer", r"premier league|la liga|serie a|bundesliga|ligue 1|champions league|europa league|world cup|mls|fc"),
+    ("NHL", r"nhl|stanley cup"),
+    ("MLB", r"mlb|world series"),
+    ("NBA", r"nba|wnba"),
+    ("NFL", r"nfl|super bowl"),
+]
+LEAGUE_TEAMS = [
+    ("NFL", r"cardinals|falcons|ravens|bills|panthers|bears|bengals|browns|cowboys|broncos|lions|packers|texans|colts|jaguars|chiefs|raiders|chargers|rams|dolphins|vikings|patriots|saints|giants|jets|eagles|steelers|49ers|seahawks|buccaneers|titans|commanders"),
+    ("NBA", r"hawks|celtics|nets|hornets|bulls|cavaliers|mavericks|nuggets|pistons|warriors|rockets|pacers|clippers|lakers|grizzlies|heat|bucks|timberwolves|pelicans|knicks|thunder|magic|76ers|suns|trail blazers|kings|spurs|raptors|jazz|wizards"),
+    ("NHL", r"bruins|maple leafs|canadiens|oilers|flames|canucks|avalanche|blackhawks|red wings|lightning|penguins|capitals|hurricanes|devils|islanders|sabres|senators|blue jackets|wild|golden knights|kraken|ducks|sharks|predators|flyers"),
+    ("MLB", r"yankees|dodgers|red sox|mets|braves|astros|phillies|padres|cubs|blue jays|mariners|orioles|guardians|twins|tigers|rays|brewers|white sox|royals|athletics|rockies|diamondbacks|nationals|pirates|reds|marlins|angels"),
+]
+
+
+def classify_league(title):
+    t = (title or "").lower()
+    for table in (LEAGUE_WORDS, LEAGUE_TEAMS):
+        for name, pattern in table:
+            if re.search(rf"\b(?:{pattern})\b", t):
+                return name
+    return None
+
+
 def classify(title):
     t = f" {(title or '').lower()} "
     for name, words in CATEGORIES:
         if any(w in t for w in words):
             return name
-    return "Other"
+    return "Sports" if classify_league(title) else "Other"
 
 
 def get(path, **params):
@@ -83,6 +112,8 @@ def main():
     ap.add_argument("--period", default="MONTH", choices=["DAY", "WEEK", "MONTH", "ALL"])
     ap.add_argument("--category", default="OVERALL")
     ap.add_argument("--min-value", type=float, default=50)
+    ap.add_argument("--out", default="data.json")
+    ap.add_argument("--no-history", action="store_true")
     args = ap.parse_args()
 
     leaders = get("/v1/leaderboard", category=args.category, timePeriod=args.period,
@@ -126,21 +157,26 @@ def main():
             "conditionId": cond, "title": g["title"], "slug": g["slug"],
             "outcome": g["outcome"], "price": g["price"], "end": g["end"],
             "category": classify(g["title"]),
+            "league": None,
             "trader_count": len(g["traders"]),
             "total_value": round(g["value"], 2),
             "invested": round(g["invested"], 2),
             "avg_entry": round(g["cost"] / g["shares"], 3) if g["shares"] else None,
             "traders": sorted(g["traders"], key=lambda x: -x["value"]),
         })
+    for r in rows:
+        if r["category"] == "Sports":
+            r["league"] = classify_league(r["title"]) or "Other sports"
     rows.sort(key=lambda r: (-r["trader_count"], -r["total_value"]))
 
     out = {"generated_at": datetime.now(timezone.utc).isoformat(),
            "trader_pool": len(leaders), "period": args.period, "category": args.category,
            "traders": trader_rows, "positions": rows}
-    with open("data.json", "w") as f:
+    with open(args.out, "w") as f:
         json.dump(out, f)
-    update_history(rows)
-    print(f"Wrote data.json with {len(rows)} position groups")
+    if not args.no_history:
+        update_history(rows)
+    print(f"Wrote {args.out} with {len(rows)} position groups")
 
 
 if __name__ == "__main__":
