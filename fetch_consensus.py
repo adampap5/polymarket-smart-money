@@ -76,34 +76,45 @@ def get(path, **params):
             time.sleep(1.5 * (attempt + 1))
 
 
-def recent_buys(wallet, name, hours, typical):
-    """Recent BUY trades by one trader, merged per market side."""
+def recent_trades(wallet, name, hours, typical, held, entry):
+    """Recent trades by one trader, merged per market side. Returns (buys, sells).
+    held: {(condition, outcome): current value}; entry: {(condition, outcome): their average buy price}."""
     since = time.time() - hours * 3600
     acts = get("/activity", user=wallet, type="TRADE", limit=500)
     merged = {}
     for a in acts if isinstance(acts, list) else []:
-        if a.get("side") != "BUY" or float(a.get("timestamp") or 0) < since:
+        side = a.get("side")
+        if side not in ("BUY", "SELL") or float(a.get("timestamp") or 0) < since:
             continue
         usd = float(a.get("usdcSize") or 0) or float(a.get("size") or 0) * float(a.get("price") or 0)
-        k = (a.get("conditionId"), a.get("outcome"))
+        k = (side, a.get("conditionId"), a.get("outcome"))
         m = merged.setdefault(k, {"usd": 0.0, "shares": 0.0, "n": 0, "ts": 0,
                                   "title": a.get("title"), "slug": a.get("slug"), "event_slug": a.get("eventSlug")})
         m["usd"] += usd
         m["shares"] += float(a.get("size") or 0)
         m["n"] += 1
         m["ts"] = max(m["ts"], int(float(a.get("timestamp") or 0)))
-    out = []
-    for (cond, outcome), m in merged.items():
+    buys, sells = [], []
+    for (side, cond, outcome), m in merged.items():
         if m["usd"] < 100:
             continue
-        out.append({
+        price = round(m["usd"] / m["shares"], 3) if m["shares"] else None
+        item = {
             "wallet": wallet, "name": name, "conditionId": cond, "outcome": outcome,
             "title": m["title"], "slug": m["slug"], "event_slug": m.get("event_slug"), "usd": round(m["usd"]), "n": m["n"], "ts": m["ts"],
-            "price": round(m["usd"] / m["shares"], 3) if m["shares"] else None,
-            "typical": round(typical),
+            "price": price, "typical": round(typical),
             "big": bool(typical and m["usd"] >= 3 * typical and m["usd"] >= 500),
-        })
-    return out
+        }
+        if side == "BUY":
+            buys.append(item)
+        else:
+            still = held.get((cond, outcome)) or 0
+            bought = entry.get((cond, outcome))
+            item["exit"] = "partial" if still >= 25 else "full"
+            item["bought_at"] = round(bought, 3) if bought else None
+            item["gain"] = round(price / bought - 1, 3) if (bought and price) else None
+            sells.append(item)
+    return buys, sells
 
 
 US_GATEWAY = "https://gateway.polymarket.us/v1/events"
@@ -174,13 +185,15 @@ def us_match(idx, slug, event_slug, title):
 
 
 def win_rate(wallet):
-    """Share of a trader's 50 most recently closed positions that made money."""
+    """Share of a trader's 50 most recently closed positions that made money, plus their average buy prices."""
     closed = get("/closed-positions", user=wallet, limit=50,
                  sortBy="TIMESTAMP", sortDirection="DESC")
     if not isinstance(closed, list) or not closed:
-        return None, 0
+        return None, 0, {}
     wins = sum(1 for c in closed if float(c.get("realizedPnl") or 0) > 0)
-    return round(wins / len(closed), 3), len(closed)
+    avg = {(c.get("conditionId"), c.get("outcome")): float(c.get("avgPrice") or 0)
+           for c in closed if c.get("conditionId") and float(c.get("avgPrice") or 0) > 0}
+    return round(wins / len(closed), 3), len(closed), avg
 
 
 def update_history(rows, keep_days=7, min_traders=3):
@@ -203,6 +216,126 @@ def update_history(rows, keep_days=7, min_traders=3):
     print(f"history.json now has {len(hist['snaps'])} snapshots")
 
 
+CALLS_FILE = "calls.json"
+TIERS = (3, 5, 8)           # "calls" are logged the first time this many top traders hold the same side
+GAMMA = "https://gamma-api.polymarket.com/markets/keyset"
+
+
+def load_calls():
+    try:
+        with open(CALLS_FILE) as f:
+            d = json.load(f)
+        d.setdefault("calls", {})
+        return d
+    except Exception:
+        return {"started": datetime.now(timezone.utc).isoformat(timespec="minutes"), "calls": {}}
+
+
+def update_calls(store, rows, pool):
+    """Log every market side the first time 3, 5 and 8 top traders hold it, with the price at that moment."""
+    now = int(time.time())
+    added = 0
+    for r in rows:
+        n, p = r["trader_count"], r.get("price")
+        if n < TIERS[0] or p is None or not (0.05 <= p <= 0.95):
+            continue   # skip near-settled prices, where "agreement" tells you nothing
+        key = f"{pool}|{r['conditionId']}|{r['outcome']}"
+        c = store["calls"].get(key)
+        if c is None:
+            c = store["calls"][key] = {"pool": pool, "cid": r["conditionId"], "o": r["outcome"], "t": r["title"],
+                                       "s": r["slug"], "es": r.get("event_slug"), "cat": r["category"], "lg": r.get("league"),
+                                       "tiers": {}, "pk": 0, "st": "open"}
+            added += 1
+        c["pk"] = max(c.get("pk", 0), n)
+        c["end"] = r.get("end")
+        for tier in TIERS:
+            if n >= tier and str(tier) not in c["tiers"]:
+                c["tiers"][str(tier)] = {"p": round(p, 3), "ts": now, "n": n}
+    return added
+
+
+def gamma_markets(cids):
+    """Look up markets by condition id (includes closed ones). Returns a list, or None if the lookup failed."""
+    def call(query):
+        req = urllib.request.Request(f"{GAMMA}?{query}", headers={"User-Agent": "consensus-dashboard/0.5"})
+        for attempt in range(3):
+            try:
+                with urllib.request.urlopen(req, timeout=40) as r:
+                    return json.load(r).get("markets") or []
+            except Exception as e:
+                if attempt == 2:
+                    print(f"  market lookup failed: {e}")
+                    return None
+                time.sleep(1.5 * (attempt + 1))
+    base = [("closed", "any"), ("limit", 100)]
+    out = call(urllib.parse.urlencode([("condition_ids", c) for c in cids] + base))
+    if out == [] and len(cids) > 1:      # the docs don't say whether ids are repeated or comma-separated: try both
+        out = call(urllib.parse.urlencode([("condition_ids", ",".join(cids))] + base))
+    return out
+
+
+def settle(market, outcome):
+    """'won' / 'lost' / 'void' once the market has settled, else None."""
+    if not market or not market.get("closed"):
+        return None
+    try:
+        names = [str(x).lower() for x in json.loads(market.get("outcomes") or "[]")]
+        prices = [float(x) for x in json.loads(market.get("outcomePrices") or "[]")]
+    except Exception:
+        return None
+    if len(names) != len(prices) or str(outcome).lower() not in names:
+        return None
+    mine, top = prices[names.index(str(outcome).lower())], max(prices)
+    if mine >= 0.99:
+        return "won"
+    if mine <= 0.01 and top >= 0.99:
+        return "lost"
+    if all(abs(x - 0.5) <= 0.02 for x in prices):
+        return "void"
+    return None
+
+
+def resolve_calls(store, max_ids=160):
+    """Ask Polymarket which logged calls have settled. Only checks calls whose end date is near or past."""
+    now = time.time()
+    def end_ts(c):
+        try:
+            e = c.get("end") or ""
+            return datetime.fromisoformat(e.replace("Z", "+00:00")).timestamp() if len(e) > 10 else \
+                   datetime.fromisoformat(e + "T23:59:59+00:00").timestamp()
+        except Exception:
+            return None
+    open_calls = [c for c in store["calls"].values() if c["st"] == "open"]
+    due = [c for c in open_calls if end_ts(c) is None or end_ts(c) <= now + 86400]
+    due.sort(key=lambda c: min(t["ts"] for t in c["tiers"].values()))
+    cids = list(dict.fromkeys(c["cid"] for c in due))[:max_ids]
+    settled = failed = 0
+    for i in range(0, len(cids), 20):
+        chunk = cids[i:i + 20]
+        found = gamma_markets(chunk)
+        if found is None:
+            failed += 1
+            continue
+        by_id = {str(m.get("conditionId", "")).lower(): m for m in found}
+        for c in due:
+            if c["cid"] in chunk:
+                result = settle(by_id.get(c["cid"].lower()), c["o"])
+                if result:
+                    c["st"], c["rs"] = result, int(now)
+                    settled += 1
+        time.sleep(0.3)
+    for c in open_calls:
+        if c["st"] == "open" and now - min(t["ts"] for t in c["tiers"].values()) > 150 * 86400:
+            c["st"] = "stale"
+    print(f"Track record: checked {len(cids)} markets, {settled} newly settled, {failed} lookups failed")
+
+
+def save_calls(store):
+    store["updated"] = datetime.now(timezone.utc).isoformat(timespec="minutes")
+    with open(CALLS_FILE, "w") as f:
+        json.dump(store, f, separators=(",", ":"))
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--top", type=int, default=50)
@@ -213,6 +346,8 @@ def main():
     ap.add_argument("--recent-hours", type=int, default=48)
     ap.add_argument("--no-history", action="store_true")
     ap.add_argument("--no-us", action="store_true", help="skip the Polymarket US market list")
+    ap.add_argument("--no-calls", action="store_true", help="do not log consensus calls to calls.json")
+    ap.add_argument("--skip-resolve", action="store_true", help="log calls but do not check which have settled")
     args = ap.parse_args()
 
     leaders = get("/v1/leaderboard", category=args.category, timePeriod=args.period,
@@ -225,7 +360,7 @@ def main():
     us_idx = us_index(us_events)
     us_count = sum(len(e.get("markets") or []) for e in us_events)
     print(f"Polymarket US: {len(us_events)} open events, {us_count} markets (ok={us_ok})")
-    recent = []
+    recent, exits = [], []
     for i, t in enumerate(leaders, 1):
         wallet = t["proxyWallet"]
         name = t.get("userName") or wallet[:8]
@@ -237,8 +372,13 @@ def main():
         print(f"  {len(positions)} positions")
         values = [float(p.get("currentValue") or 0) for p in positions]
         typical = statistics.median(values) if values else 0
-        recent += recent_buys(wallet, name, args.recent_hours, typical)
-        wr, wr_n = win_rate(wallet)
+        wr, wr_n, closed_avg = win_rate(wallet)
+        held = {(p.get("conditionId"), p.get("outcome")): float(p.get("currentValue") or 0) for p in positions}
+        entry = {**closed_avg, **{(p.get("conditionId"), p.get("outcome")): float(p.get("avgPrice") or 0)
+                                  for p in positions if float(p.get("avgPrice") or 0) > 0}}
+        buys, sells = recent_trades(wallet, name, args.recent_hours, typical, held, entry)
+        recent += buys
+        exits += sells
         trader_rows.append({
             "rank": i, "name": name, "wallet": wallet,
             "pnl": round(float(t.get("pnl") or 0)), "volume": round(float(t.get("vol") or 0)),
@@ -281,7 +421,7 @@ def main():
         r["us_path"] = m["path"] if m else None
     rows.sort(key=lambda r: (-r["trader_count"], -r["total_value"]))
     held = {(r["conditionId"], r["outcome"]): r for r in rows}
-    for b in recent:
+    for b in recent + exits:
         g = held.get((b["conditionId"], b["outcome"]))
         b["holders"] = g["trader_count"] if g else None
         b["now"] = g["price"] if g else None
@@ -292,10 +432,19 @@ def main():
         b["category"] = classify(b["title"])
         b["league"] = (classify_league(b["title"]) or "Other sports") if b["category"] == "Sports" else None
     recent.sort(key=lambda b: -b["ts"])
+    exits.sort(key=lambda b: -b["ts"])
+
+    if not args.no_calls:
+        store = load_calls()
+        added = update_calls(store, rows, args.category)
+        if not args.skip_resolve:
+            resolve_calls(store)
+        save_calls(store)
+        print(f"calls.json: {len(store['calls'])} calls logged ({added} new this run)")
 
     out = {"generated_at": datetime.now(timezone.utc).isoformat(),
            "trader_pool": len(leaders), "period": args.period, "category": args.category,
-           "traders": trader_rows, "positions": rows, "recent": recent[:400],
+           "traders": trader_rows, "positions": rows, "recent": recent[:400], "exits": exits[:400],
            "us": {"ok": bool(us_ok and us_events), "markets": us_count,
                   "matched": sum(1 for r in rows if r.get("us")), "total": len(rows)}}
     with open(args.out, "w") as f:
