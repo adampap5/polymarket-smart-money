@@ -438,8 +438,17 @@ def main():
     ap.add_argument("--skip-resolve", action="store_true", help="log calls but do not check which have settled")
     args = ap.parse_args()
 
-    leaders = get("/v1/leaderboard", category=args.category, timePeriod=args.period,
-                  orderBy="PNL", limit=min(args.top, 50))
+    leaders = []
+    while len(leaders) < args.top:   # the leaderboard returns at most 50 per request, so page through it
+        chunk = get("/v1/leaderboard", category=args.category, timePeriod=args.period,
+                    orderBy="PNL", limit=min(50, args.top - len(leaders)), offset=len(leaders))
+        if not chunk:
+            break
+        seen = {l.get("proxyWallet") for l in leaders}
+        chunk = [l for l in chunk if l.get("proxyWallet") not in seen]
+        if not chunk:
+            break
+        leaders += chunk
     print(f"Tracking {len(leaders)} traders ({args.category}, {args.period}, by profit)")
 
     groups = defaultdict(lambda: {"traders": [], "value": 0.0, "invested": 0.0, "cost": 0.0, "shares": 0.0})
