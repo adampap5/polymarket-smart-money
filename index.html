@@ -134,18 +134,43 @@ th{font-weight:600;color:var(--mute);font-size:12px;background:var(--soft)}th:fi
 @media(max-width:820px){.evr{grid-template-columns:auto 1fr;gap:8px 12px}.evr .cell{grid-column:auto}}
 @media(max-width:820px){.shell{grid-template-columns:1fr;margin:0;border-radius:0;border:0}.side{flex-direction:row;flex-wrap:wrap;align-items:center;border-right:0;border-bottom:1px solid var(--line);padding:12px}.brand{padding:0 8px 0 4px}.sect,.promo{display:none}.nav{width:auto;padding:8px 12px}.search{margin-left:0;width:100%}.main{padding:14px}
  .mhead{display:none}.mrow summary{grid-template-columns:1fr 1fr;gap:10px 14px}.mrow summary>:first-child{grid-column:1/3}.lbl{display:block;font-size:11px;color:var(--mute)}.item{grid-template-columns:1fr auto}.item .when,.item .tags{grid-column:1/3}.chart{grid-template-columns:40px 1fr}}
+[hidden]{display:none!important}
+.bets{display:inline-flex;flex-wrap:wrap;gap:6px;align-items:center}
+.betbtn.kal{background:#eef2ff;color:#4254c5}.betbtn.kal:hover{filter:brightness(.95)}
+.pick{display:grid;grid-template-columns:64px minmax(0,1fr) auto;gap:6px 16px;padding:16px 4px;border-bottom:1px solid var(--line);align-items:start}.pick:last-child{border-bottom:0}
+.score{width:56px;height:56px;border-radius:16px;display:flex;flex-direction:column;align-items:center;justify-content:center;font-weight:800;line-height:1}
+.score b{font-size:22px;letter-spacing:-.02em}.score span{font-size:10.5px;font-weight:600;margin-top:3px;opacity:.8}
+.score.hi{background:var(--g2);color:#0f3a1d}.score.mid{background:var(--g1);color:#173f24}.score.lo{background:var(--soft);color:var(--mute)}
+.pm .t{font-size:15px}.why{list-style:none;margin:8px 0 0;padding:0;display:grid;gap:3px;font-size:12.5px;color:var(--mute)}
+.why li:before{content:"·";display:inline-block;width:16px;color:var(--mute);font-weight:800}.why li.good{color:#2f6b43;font-weight:600}.why li.good:before{content:"✓";color:var(--g3)}
+.pm details{margin-top:8px;font-size:12px;color:var(--mute)}.pm details summary{cursor:pointer;color:var(--g3);font-weight:600}
+.pm details table{margin-top:6px;font-size:12px}.pm details th,.pm details td{padding:5px 8px}
+.pa{display:flex;flex-direction:column;align-items:flex-end;gap:8px}
+@media(max-width:820px){.pick{grid-template-columns:56px 1fr}.pa{grid-column:1/3;flex-direction:row;align-items:center;justify-content:flex-start;flex-wrap:wrap}}
+.bf{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px 12px;margin:12px 0 6px;align-items:end}
+.bf label{display:grid;gap:3px;font-size:11.5px;color:var(--mute);font-weight:600}.bf input,.bf select{width:100%}
+.bf .wide{grid-column:span 2}
+.btn{font:inherit;font-size:13px;font-weight:700;border:0;border-radius:10px;background:var(--g3);color:#fff;padding:0 16px;height:32px;cursor:pointer}.btn.ghost{background:var(--soft);color:var(--ink);border:1px solid var(--line)}
+.mini{font:inherit;font-size:12px;font-weight:700;border:1px solid var(--line);background:#fff;border-radius:8px;padding:2px 9px;cursor:pointer;color:var(--ink)}.mini.w{color:var(--g3)}.mini.l{color:var(--red)}.mini.x{color:var(--mute)}.mini.armed{background:var(--rbg);color:var(--red);border-color:var(--rbg)}
+.sellp{width:58px;height:26px!important;font-size:12px!important;padding:0 6px!important}
+.nowin{width:64px;height:28px!important;font-size:12px!important}
+.btable td,.btable th{font-size:13px;vertical-align:top}.btable td:nth-child(1),.btable th:nth-child(1){text-align:left;min-width:220px}
+.btable td:last-child,.btable th:last-child{text-align:right}
+.acts{display:flex;gap:5px;flex-wrap:wrap;justify-content:flex-end;align-items:center}
 </style>
 </head>
 <body>
 <div class="shell">
   <aside class="side">
     <div class="brand"><span class="logo"></span>Smart Money</div>
-    <button class="nav" id="t-m" aria-selected="true"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h7v7H4zM13 4h7v7h-7zM4 13h7v7H4zM13 13h7v7h-7z"/></svg>Markets</button>
+    <button class="nav" id="t-p" aria-selected="true"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m12 3 2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1-4.4-4.3 6.1-.9z"/></svg>Top picks</button>
+    <button class="nav" id="t-m" aria-selected="false"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h7v7H4zM13 4h7v7h-7zM4 13h7v7H4zM13 13h7v7h-7z"/></svg>Markets</button>
     <button class="nav" id="t-f" aria-selected="false"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2 4 14h7l-1 8 9-12h-7z"/></svg>New bets</button>
     <button class="nav" id="t-x" aria-selected="false"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10 4H5v16h5M15 8l4 4-4 4M19 12H9"/></svg>Exits</button>
     <button class="nav" id="t-c" aria-selected="false"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3.5" y="5" width="17" height="15" rx="3"/><path d="M3.5 10h17M8 3v4M16 3v4"/></svg>Calendar</button>
     <button class="nav" id="t-r" aria-selected="false"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg>Track record</button>
     <button class="nav" id="t-t" aria-selected="false"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c0-3.6 2.9-6 6.5-6s6.5 2.4 6.5 6M16 4.5a3.5 3.5 0 0 1 0 7M18 14c2.2.6 3.5 2.4 3.5 5"/></svg>Top traders</button>
+    <button class="nav" id="t-b" aria-selected="false"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="3.5" width="16" height="17" rx="3"/><path d="M8 9h8M8 13h8M8 17h4"/></svg>My bets</button>
     <div class="sect">Whose bets</div>
     <div id="src"></div>
     <div class="sect">Where you can bet</div>
@@ -155,6 +180,8 @@ th{font-weight:600;color:var(--mute);font-size:12px;background:var(--soft)}th:fi
       <li><b>Top traders</b> is how many tracked earners hold that side.</li>
       <li><b>Worth now</b> is today’s value. The percentage compares it to what they put in.</li>
       <li><b>Price</b> is in cents: 55¢ means roughly a 55% chance. Click a row to see who holds it.</li>
+      <li><b>Top picks</b> ranks ideas by a conviction score. <b>My bets</b> is your own log, saved only in this browser.</li>
+      <li>The <b>Kalshi</b> button opens the matching Kalshi market when one is found, otherwise a search for it.</li>
       <li>The <b>Bet</b> buttons open that market on Polymarket. You place the bet there with your own account. Hover over a button, or tap the <b>?</b> beside it, for a plain-English explanation.</li>
     </ul></details>
   </aside>
@@ -165,7 +192,43 @@ th{font-weight:600;color:var(--mute);font-size:12px;background:var(--soft)}th:fi
       <label class="search" aria-label="Search markets"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="6.5"/><path d="m20 20-4-4"/></svg><input type="text" id="q" placeholder="Search markets"></label>
     </header>
 
-    <div id="markets" class="grid">
+    <section id="picks">
+      <div class="panel">
+        <p class="note">The best current ideas, ranked by a <b>conviction score</b> out of 100: how many top traders agree, how big their positions are for them, how much of their money is on it, and whether the price still has room. The weights are my judgment and haven’t been tested. The Track record tab shows over time whether agreement pays.</p>
+        <div class="ctl" style="margin-top:0">
+          <label>Show<select id="p-mode"><option value="conf">All sports + confident bets elsewhere</option><option value="sports">Sports only</option><option value="all">Everything</option></select></label>
+          <label>Minimum traders on a side<select id="p-min"><option value="1">1</option><option value="2" selected>2</option><option value="3">3</option><option value="5">5</option></select></label>
+        </div>
+        <div id="p-list"></div>
+      </div>
+    </section>
+
+    <section id="bets" hidden>
+      <div class="panel">
+        <p class="note">Log bets you’ve placed on Kalshi or Polymarket, or practice bets, and see how they’re doing. Everything here is saved <b>in this browser only</b>. It’s never uploaded, so it stays private. Profit and loss are before fees.</p>
+        <div class="callout warn" id="b-warn" hidden>This browser isn’t letting the page save. Your bets will disappear when you close it, so use <b>Download backup</b> below.</div>
+        <div class="stats" id="b-cards"></div>
+        <h3 class="sec">Add a bet</h3>
+        <form class="bf" id="b-form" autocomplete="off">
+          <label>Type<select id="b-kind"><option value="real">Real bet</option><option value="practice">Practice bet</option></select></label>
+          <label>Where<select id="b-plat"><option>Kalshi</option><option>Polymarket</option><option>Other</option></select></label>
+          <label class="wide">Market<input type="text" id="b-title" list="b-titles" placeholder="Start typing a market name" required></label>
+          <datalist id="b-titles"></datalist>
+          <label>Side<input type="text" id="b-side" list="b-sides" value="Yes" required></label>
+          <datalist id="b-sides"><option value="Yes"><option value="No"></datalist>
+          <label>Price paid (¢ per contract)<input type="number" id="b-price" min="1" max="99" step="0.1" placeholder="e.g. 55" required></label>
+          <label>Contracts<input type="number" id="b-qty" min="1" step="1" placeholder="e.g. 100" required></label>
+          <button class="btn" type="submit">Add bet</button>
+        </form>
+        <div class="ds" id="b-msg"></div>
+        <div class="chips" id="b-filter" style="margin:14px 0 4px"></div>
+        <div id="b-open"></div>
+        <div id="b-done"></div>
+        <div class="ctl" style="margin-top:18px"><button class="btn ghost" type="button" id="b-dl">Download backup</button><label class="btn ghost" style="display:inline-flex;align-items:center;margin:0">Restore backup<input type="file" id="b-restore" accept="application/json,.json" hidden></label></div>
+      </div>
+    </section>
+
+    <div id="markets" class="grid" hidden>
       <div class="col">
         <div class="stats" id="cards"></div>
         <div class="panel">
@@ -267,19 +330,151 @@ const explain = o => {
   lines.push(`This only opens the market. Nothing is bought until you confirm there.`);
   return lines;
 };
-const bet = o => {
+const betPoly = o => {
   const h = href(o);
   if (!h) return usOn ? `<span class="pill gray">On Polymarket US</span>` : "";
   const L = explain(o);
   return `<span class="bw" data-tip="${esc(L.join("\n"))}"><a class="betbtn ${esc(o.outcome)}" href="${esc(h)}" target="_blank" rel="noopener">Bet ${esc(o.outcome).toUpperCase()}</a><span class="info" tabindex="0" aria-label="What does this mean?">?</span></span>`;
 };
+const bet = o => { const a = betPoly(o); const k = kal(o); return `<span class="bets">${a}${k}</span>`; };
 const chg = (v, i) => i ? v / i - 1 : null;
 const pct = x => `${x >= 0 ? "+" : "−"}${Math.abs(Math.round(x * 100))}%`;
 const pnlPill = x => x == null ? `<span class="pill gray">–</span>` : `<span class="pill ${x >= 0 ? "" : "down"}">${pct(x)}</span>`;
 const niceMax = m => { if (!(m > 0)) return 1; const mag = 10 ** Math.floor(Math.log10(m)); return [1,2,2.5,5,10].map(k => k * mag).find(v => v >= m); };
 let data, raw, usOn = false, cat = "All", league = "All", file = "data.json"; const cache = {};
 const SRC = [["data.json","Top overall earners"],["data_sports.json","Top sports earners"]];
-const TITLES = {m: "Markets", f: "New bets", x: "Exits", c: "Calendar", r: "Track record", t: "Top traders"};
+const TITLES = {p: "Top picks", b: "My bets", m: "Markets", f: "New bets", x: "Exits", c: "Calendar", r: "Track record", t: "Top traders"};
+
+/* ---------- Kalshi link ---------- */
+const kalUrl = o => o.kalshi_url || "https://www.google.com/search?q=" + encodeURIComponent("site:kalshi.com " + (o.title || ""));
+const kal = o => `<a class="betbtn kal" href="${esc(kalUrl(o))}" target="_blank" rel="noopener" title="${o.kalshi_url ? "Opens the matching Kalshi page" : "No exact match found. Opens a search for this market on Kalshi"}">${o.kalshi_url ? "Kalshi" : "Find on Kalshi"}</a>`;
+
+/* ---------- Top picks ---------- */
+const clamp = (x, a, b) => Math.min(b, Math.max(a, x));
+let pickReg = [];
+function pickScore(r){
+  const N = data.trader_pool, parts = [];
+  parts.push({k: "Agreement", pts: 35 * Math.min(r.trader_count, 10) / 10, max: 35, why: `${r.trader_count} of ${N} top traders hold this side`});
+  const hv = r.heavy || 0;
+  parts.push({k: "Big positions", pts: 25 * Math.min(hv, 4) / 4, max: 25, why: r.heavy == null ? "Run the Update data job to see this" : hv ? `${hv} of them hold 3× or more their usual position size` : "No unusually large positions"});
+  const av = r.avg_share;
+  parts.push({k: "Share of their money", pts: av == null ? 0 : 20 * Math.min(av / 0.10, 1), max: 20, why: av == null ? "Run the Update data job to see this" : `On average ${Math.round(av * 100)}% of their total money`});
+  let room = 0, rw = "Price not available";
+  if (r.price != null && r.avg_entry) { const d = r.price - r.avg_entry; room = d <= 0.02 ? 10 : 10 * Math.max(0, 1 - (d - 0.02) / 0.2);
+    rw = d <= 0.02 ? `Still cheap: ${cents(r.price)} now vs ${cents(r.avg_entry)} they paid` : `Up ${Math.round(d * 100)}¢ since they bought (${cents(r.avg_entry)} → ${cents(r.price)})`; }
+  parts.push({k: "Price room", pts: room, max: 10, why: rw});
+  parts.push({k: "Money behind it", pts: 10 * clamp(Math.log10(Math.max(r.total_value, 1) / 1000) / 2, 0, 1), max: 10, why: `${money(r.total_value)} combined`});
+  return {score: Math.round(parts.reduce((s, p) => s + p.pts, 0)), parts};
+}
+function renderPicks(){
+  const mode = $("p-mode").value, min = +$("p-min").value;
+  const rows = data.positions.filter(r => {
+    const d = daysLeft(r.end), sports = r.category === "Sports";
+    if (r.trader_count < min || (d != null && d < 0) || (r.price != null && (r.price < 0.05 || r.price > 0.95))) return false;
+    if (mode === "sports") return sports;
+    if (mode === "conf") return sports || (r.heavy || 0) >= 1 || (r.avg_share || 0) >= 0.05;
+    return true;
+  }).map(r => ({r, s: pickScore(r)})).sort((a, b) => b.s.score - a.s.score || b.r.trader_count - a.r.trader_count).slice(0, 12);
+  pickReg = rows.map(x => x.r);
+  $("p-list").innerHTML = rows.length ? rows.map(({r, s}, i) => {
+    const d = daysLeft(r.end), when = d == null ? "" : d < 1 ? "Closes today" : `Closes in ${Math.ceil(d)}d`;
+    return `<div class="pick"><div class="score ${s.score >= 70 ? "hi" : s.score >= 50 ? "mid" : "lo"}"><b>${s.score}</b><span>score</span></div>
+      <div class="pm"><div class="t"><span class="side-tag ${esc(r.outcome)}">${esc(r.outcome).toUpperCase()}</span>${lnk(r, esc(r.title))}</div>
+        <div class="tags">${tag(r)}${when ? `<span class="tag ${d != null && d <= 7 ? "soon" : ""}">${when}</span>` : ""}</div>
+        <ul class="why">${s.parts.map(p => `<li class="${p.pts >= p.max * 0.6 ? "good" : ""}">${esc(p.why)}</li>`).join("")}</ul>
+        <details><summary>How the score is built</summary><table><thead><tr><th>Part</th><th>Points</th></tr></thead><tbody>${s.parts.map(p => `<tr><td>${esc(p.k)}</td><td>${p.pts.toFixed(1)} / ${p.max}</td></tr>`).join("")}</tbody></table></details></div>
+      <div class="pa">${bet(r)}<button class="mini" data-log="${i}">Log a bet</button></div></div>`; }).join("")
+    : '<div class="empty">No ideas match right now. Try “Everything” or a lower minimum number of traders.</div>';
+}
+
+/* ---------- My bets (saved in this browser only) ---------- */
+const LS = "smartmoney.mybets.v1";
+let myBets = [], betFilter = "all", pending = null, armed = null;
+function loadBets(){ try { const v = JSON.parse(localStorage.getItem(LS) || "[]"); myBets = Array.isArray(v) ? v.filter(b => b && b.title && b.p > 0) : []; } catch (e) { myBets = []; } }
+function saveBets(){ try { localStorage.setItem(LS, JSON.stringify(myBets)); $("b-warn").hidden = true; } catch (e) { $("b-warn").hidden = false; } }
+const usd = x => (x >= 0 ? "+" : "−") + money(Math.abs(x));
+const tone = x => x == null ? "" : x >= 0 ? "up" : "down";
+function nowPrice(b){
+  const pos = (raw.positions || []).find(p => p.conditionId === b.cid && String(p.outcome).toLowerCase() === String(b.side).toLowerCase());
+  return {pos, price: pos && pos.price != null ? pos.price : (b.cur != null ? b.cur : null)};
+}
+function renderBets(){
+  const dl = $("b-titles"), seen = new Set();
+  dl.innerHTML = (raw.positions || []).filter(p => !seen.has(p.title) && seen.add(p.title)).slice(0, 300).map(p => `<option value="${esc(p.title)}">`).join("");
+  const list = myBets.filter(b => betFilter === "all" || b.kind === betFilter);
+  const open = list.filter(b => b.st === "open"), done = list.filter(b => b.st !== "open");
+  const cutoff = Date.now() / 1000 - 48 * 3600;
+  let cost = 0, unreal = 0, unrealCost = 0, real = 0, w = 0, l = 0;
+  open.forEach(b => { cost += b.qty * b.p; const n = nowPrice(b).price; if (n != null) { unreal += b.qty * (n - b.p); unrealCost += b.qty * b.p; } });
+  done.forEach(b => { const v = b.st === "won" ? 1 : b.st === "lost" ? 0 : b.exit; real += b.qty * (v - b.p); if (b.qty * (v - b.p) >= 0) w++; else l++; });
+  const card = (lab, v, pill, s, c) => `<div class="stat nohover"><div class="row1">${lab}<span class="ico ${c}">●</span></div><div class="v">${v}</div><div class="row3">${pill}<span>${s}</span></div></div>`;
+  $("b-cards").innerHTML =
+    card("Open bets", open.length, "", `${money(cost)} put in`, "") +
+    card("Open profit / loss", unrealCost ? usd(unreal) : "–", unrealCost ? `<span class="pill ${unreal >= 0 ? "" : "down"}">${pct(unreal / unrealCost)}</span>` : "", unrealCost ? "Where prices are known" : "No prices known yet", "b") +
+    card("Settled profit / loss", done.length ? usd(real) : "–", "", done.length ? `${w} up · ${l} down` : "Nothing settled yet", "o") +
+    card("Logged in total", list.length, "", betFilter === "all" ? "Real and practice" : betFilter === "real" ? "Real bets" : "Practice bets", "p");
+  $("b-filter").innerHTML = [["all", "All"], ["real", "Real"], ["practice", "Practice"]].map(([k, t]) => `<button class="chip" aria-pressed="${betFilter === k}" data-bf="${k}">${t}</button>`).join("");
+  const exitsBy = {}; (raw.exits || []).filter(x => x.ts >= cutoff).forEach(x => { (exitsBy[x.conditionId + "|" + String(x.outcome).toLowerCase()] = exitsBy[x.conditionId + "|" + String(x.outcome).toLowerCase()] || new Set()).add(x.wallet); });
+  const head = `<thead><tr><th>Bet</th><th>Paid</th><th>Contracts</th><th>Now</th><th>Profit / loss</th><th>Top traders</th><th></th></tr></thead>`;
+  $("b-open").innerHTML = open.length ? `<h3 class="sec">Open</h3><div class="scroll"><table class="btable">${head}<tbody>` + open.map(b => {
+    const {pos, price} = nowPrice(b), n = price, pl = n == null ? null : b.qty * (n - b.p);
+    const sellers = exitsBy[b.cid + "|" + String(b.side).toLowerCase()];
+    return `<tr><td><span class="side-tag ${esc(b.side)}">${esc(String(b.side).toUpperCase())}</span> ${b.slug || b.es ? `<a href="https://polymarket.com/event/${esc(b.es || b.slug)}" target="_blank" rel="noopener">${esc(b.title)}</a>` : esc(b.title)}
+        <div class="tags"><span class="tag">${b.kind === "real" ? "Real" : "Practice"} · ${esc(b.plat)}</span><span class="tag">${new Date(b.ts).toLocaleDateString()}</span></div></td>
+      <td>${cents(b.p)}</td><td>${b.qty}</td>
+      <td>${pos ? cents(n) : `<input class="nowin" type="number" min="1" max="99" step="0.1" data-cur="${b.id}" placeholder="¢" value="${b.cur != null ? Math.round(b.cur * 1000) / 10 : ""}" aria-label="Current price in cents">`}</td>
+      <td class="${tone(pl)}">${pl == null ? "–" : usd(pl) + " (" + pct((n - b.p) / b.p) + ")"}</td>
+      <td>${pos ? `${pos.trader_count} still hold it` : "Not on the dashboard"}${sellers ? `<br><span class="pill down">${sellers.size} sold recently</span>` : ""}</td>
+      <td><div class="acts"><button class="mini w" data-act="won" data-id="${b.id}">Won</button><button class="mini l" data-act="lost" data-id="${b.id}">Lost</button>
+        <input class="sellp" type="number" min="0" max="100" step="0.1" placeholder="Sold ¢" data-sp="${b.id}"><button class="mini" data-act="sold" data-id="${b.id}">Sold</button>
+        <button class="mini x ${armed === b.id ? "armed" : ""}" data-act="del" data-id="${b.id}">${armed === b.id ? "Delete?" : "×"}</button></div></td></tr>`; }).join("") + "</tbody></table></div>"
+    : `<div class="empty">${myBets.length ? "No open bets in this view." : "No bets yet. Add one above, or use “Log a bet” on the Top picks tab."}</div>`;
+  $("b-done").innerHTML = done.length ? `<h3 class="sec">Settled</h3><div class="scroll"><table class="btable"><thead><tr><th>Bet</th><th>Paid</th><th>Contracts</th><th>Result</th><th>Profit / loss</th><th></th></tr></thead><tbody>` + done.sort((a, b) => (b.closed || 0) - (a.closed || 0)).map(b => {
+    const v = b.st === "won" ? 1 : b.st === "lost" ? 0 : b.exit, pl = b.qty * (v - b.p);
+    return `<tr><td><span class="side-tag ${esc(b.side)}">${esc(String(b.side).toUpperCase())}</span> ${esc(b.title)}<div class="tags"><span class="tag">${b.kind === "real" ? "Real" : "Practice"} · ${esc(b.plat)}</span></div></td>
+      <td>${cents(b.p)}</td><td>${b.qty}</td><td>${b.st === "sold" ? "Sold at " + cents(b.exit) : b.st === "won" ? "Won" : "Lost"}</td><td class="${tone(pl)}">${usd(pl)} (${pct((v - b.p) / b.p)})</td>
+      <td><div class="acts"><button class="mini x ${armed === b.id ? "armed" : ""}" data-act="del" data-id="${b.id}">${armed === b.id ? "Delete?" : "×"}</button></div></td></tr>`; }).join("") + "</tbody></table></div>" : "";
+}
+function addBet(e){
+  e.preventDefault();
+  const title = $("b-title").value.trim(), side = $("b-side").value.trim(), p = +$("b-price").value / 100, qty = +$("b-qty").value;
+  if (!title || !side || !(p > 0 && p < 1) || !(qty >= 1)) { $("b-msg").textContent = "Fill in the market, side, a price between 1 and 99¢, and the number of contracts."; return; }
+  const hit = (pending && pending.title === title) ? pending : (raw.positions || []).find(x => x.title === title && String(x.outcome).toLowerCase() === side.toLowerCase());
+  myBets.push({id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6), ts: Date.now(), kind: $("b-kind").value, plat: $("b-plat").value, title, side, p, qty,
+    cid: hit ? hit.conditionId : null, slug: hit ? hit.slug : null, es: hit ? hit.event_slug : null, st: "open"});
+  pending = null; saveBets(); $("b-title").value = ""; $("b-price").value = ""; $("b-qty").value = "";
+  $("b-msg").textContent = hit ? "Added. Live prices and top-trader activity will show for this one." : "Added. This market isn’t on the dashboard, so type its current price in the Now column to see profit and loss.";
+  renderBets();
+}
+function logFromPick(i){
+  const r = pickReg[i]; if (!r) return;
+  $("b-title").value = r.title; $("b-side").value = r.outcome; $("b-price").value = r.price != null ? Math.round(r.price * 1000) / 10 : ""; $("b-qty").value = "";
+  pending = {title: r.title, conditionId: r.conditionId, outcome: r.outcome, slug: r.slug, event_slug: r.event_slug};
+  $("b-msg").textContent = "Filled in from the pick. Set the type, where you bet and how many contracts, then add it.";
+  show("b"); renderBets(); $("b-qty").focus();
+}
+function betAction(act, id, root){
+  const b = myBets.find(x => x.id === id); if (!b) return;
+  if (act === "del") { if (armed === id) { myBets = myBets.filter(x => x.id !== id); armed = null; saveBets(); } else armed = id; renderBets(); return; }
+  armed = null;
+  if (act === "won") { b.st = "won"; b.closed = Date.now(); }
+  else if (act === "lost") { b.st = "lost"; b.closed = Date.now(); }
+  else if (act === "sold") { const v = parseFloat((root.querySelector(`[data-sp="${id}"]`) || {}).value); if (!(v >= 0 && v <= 100)) { $("b-msg").textContent = "Type the price you sold at, in cents, next to Sold."; return; } b.st = "sold"; b.exit = v / 100; b.closed = Date.now(); }
+  saveBets(); renderBets();
+}
+function bindBets(){
+  $("b-form").addEventListener("submit", addBet);
+  $("b-title").addEventListener("input", () => { if (pending && pending.title !== $("b-title").value) pending = null; });
+  $("b-filter").addEventListener("click", e => { const x = e.target.closest && e.target.closest("[data-bf]"); if (x) { betFilter = x.dataset.bf; renderBets(); } });
+  $("bets").addEventListener("click", e => { const x = e.target.closest && e.target.closest("[data-act]"); if (x) betAction(x.dataset.act, x.dataset.id, $("bets")); });
+  $("bets").addEventListener("change", e => { const t = e.target; if (t && t.dataset && t.dataset.cur) { const b = myBets.find(y => y.id === t.dataset.cur); const v = parseFloat(t.value); if (b) { b.cur = v > 0 && v < 100 ? v / 100 : null; saveBets(); renderBets(); } } });
+  $("p-list").addEventListener("click", e => { const x = e.target.closest && e.target.closest("[data-log]"); if (x) logFromPick(+x.dataset.log); });
+  $("b-dl").addEventListener("click", () => { const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([JSON.stringify(myBets, null, 1)], {type: "application/json"})); a.download = "my-bets-backup.json"; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 1000); });
+  $("b-restore").addEventListener("change", e => { const f = e.target.files && e.target.files[0]; if (!f) return; const rd = new FileReader();
+    rd.onload = () => { try { const v = JSON.parse(rd.result); if (!Array.isArray(v)) throw 0; const ok = v.filter(b => b && b.title && b.p > 0 && b.qty >= 1 && b.id); const have = new Set(myBets.map(b => b.id)); myBets = myBets.concat(ok.filter(b => !have.has(b.id))); saveBets(); $("b-msg").textContent = `Restored ${ok.length} bet${ok.length === 1 ? "" : "s"}.`; renderBets(); } catch (x) { $("b-msg").textContent = "That file isn’t a backup from this page."; } };
+    rd.readAsText(f); e.target.value = ""; });
+  ["p-mode", "p-min"].forEach(id => $(id).addEventListener("input", renderPicks));
+}
 
 function renderSrc(){
   $("src").innerHTML = SRC.map(([f,l]) => `<button class="nav" aria-pressed="${f === file}" data-f="${f}">${l}</button>`).join("");
@@ -580,7 +775,7 @@ function renderRec(){
     ${catTable}${doneList}${openList}`;
 }
 
-const SECTIONS = {m: "markets", f: "feed", x: "exits", c: "cal", r: "rec", t: "traders"};
+const SECTIONS = {p: "picks", b: "bets", m: "markets", f: "feed", x: "exits", c: "cal", r: "rec", t: "traders"};
 function show(tab){
   Object.entries(SECTIONS).forEach(([k, id]) => { $(id).hidden = tab !== k; $("t-" + k).setAttribute("aria-selected", tab === k); });
   $("title").textContent = TITLES[tab];
@@ -628,7 +823,7 @@ function apply(){
   $("min").max = max; $("min").value = Math.min(3, max);
   $("meta").textContent = `Tracking the top ${d.trader_pool} ${file.includes("sports") ? "sports " : ""}earners of the past ${d.period.toLowerCase()} · Updated ${new Date(d.generated_at).toLocaleString()}`;
   renderUs(); renderCards(); renderSide(); renderChips(); renderLeagues(); render(); renderTraders(); renderFeedFilters(); renderFeed();
-  renderExitFilters(); renderExits(); renderCalFilters(); calDay = null; renderCal(); renderRec();
+  renderExitFilters(); renderExits(); renderCalFilters(); calDay = null; renderCal(); renderRec(); renderPicks(); renderBets();
 }
 
 function load(f){
@@ -650,7 +845,9 @@ $("c-days").addEventListener("click", e => { const b = e.target.closest && e.tar
 $("r-body").addEventListener("click", e => { const b = e.target.closest && e.target.closest("[data-tier]"); if (b) { recTier = b.dataset.tier; renderRec(); } });
 Object.keys(SECTIONS).forEach(k => { $("t-" + k).onclick = () => show(k); });
 fetch("calls.json").then(r => { if (!r.ok) throw 0; return r.json(); }).then(d => { calls = d; if (raw) renderRec(); }).catch(() => { calls = null; if (raw) renderRec(); });
+loadBets(); bindBets();
 $("seeall").onclick = () => show("f");
+show("p");
 load("data.json");
 </script>
 </body>

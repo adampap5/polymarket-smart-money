@@ -4,7 +4,7 @@ Usage: python fetch_consensus.py [--top 50] [--period MONTH] [--category OVERALL
 Standard library only. Uses Polymarket's public Data API (no key needed).
 """
 import argparse, json, os, re, statistics, time, urllib.parse, urllib.request
-from collections import defaultdict
+from collections import Counter, defaultdict
 from datetime import datetime, timezone
 
 BASE = "https://data-api.polymarket.com"
@@ -184,6 +184,93 @@ def us_match(idx, slug, event_slug, title):
     return by_title.get(norm(title))
 
 
+KALSHI_BASES = ("https://external-api.kalshi.com/trade-api/v2", "https://api.elections.kalshi.com/trade-api/v2")
+STOP = {"will", "the", "a", "an", "of", "by", "in", "on", "at", "to", "vs", "and", "or", "be", "is", "for", "win", "wins"}
+
+
+def tokens(text):
+    return {w for w in re.findall(r"[a-z0-9]+", (text or "").lower()) if w not in STOP}
+
+
+def fetch_kalshi_markets(max_pages=40, budget=150):
+    """Open markets on Kalshi. Public endpoint, no login. Returns (markets, ok)."""
+    start = time.time()
+    for base in KALSHI_BASES:
+        markets, cursor = [], None
+        for _ in range(max_pages):
+            if time.time() - start > budget:
+                break
+            q = {"status": "open", "limit": 1000}
+            if cursor:
+                q["cursor"] = cursor
+            data = None
+            for attempt in range(3):
+                try:
+                    req = urllib.request.Request(f"{base}/markets?{urllib.parse.urlencode(q)}",
+                                                 headers={"User-Agent": "consensus-dashboard/0.6"})
+                    with urllib.request.urlopen(req, timeout=60) as r:
+                        data = json.load(r)
+                    break
+                except Exception as e:
+                    if attempt == 2:
+                        print(f"  Kalshi market list failed ({base}): {e}")
+                    else:
+                        time.sleep(1.5 * (attempt + 1))
+            if data is None:
+                break
+            batch = data.get("markets") or []
+            markets += batch
+            cursor = data.get("cursor")
+            if not cursor or not batch:
+                break
+        if markets:
+            return markets, True
+    return [], False
+
+
+def kalshi_index(markets):
+    items, postings = [], defaultdict(list)
+    for m in markets:
+        toks = tokens(m.get("title"))
+        if len(toks) < 2:
+            continue
+        series = m.get("series_ticker") or (m.get("event_ticker") or "").split("-")[0]
+        if not series:
+            continue
+        i = len(items)
+        items.append((toks, {t for t in toks if t.isdigit()}, series, m.get("ticker")))
+        for t in toks:
+            postings[t].append(i)
+    return items, postings
+
+
+def kalshi_match(idx, title, threshold=0.75):
+    """Conservative: nearly identical wording and identical numbers. Returns the Kalshi series page URL or None."""
+    items, postings = idx
+    q = tokens(title)
+    if len(q) < 3:
+        return None
+    qn = {t for t in q if t.isdigit()}
+    hits = Counter()
+    for t in q:
+        lst = postings.get(t)
+        if lst and len(lst) <= 3000:
+            hits.update(lst)
+    best, best_score = None, 0.0
+    for i, n in hits.items():
+        if n < 3:
+            continue
+        toks, nums, series, ticker = items[i]
+        if nums != qn:
+            continue
+        score = len(q & toks) / len(q | toks)
+        if score > best_score:
+            best, best_score = (series, ticker), score
+    if best and best_score >= threshold:
+        return {"url": f"https://kalshi.com/markets/{best[0].lower()}", "ticker": best[1]}
+    return None
+
+
 def win_rate(wallet):
     """Share of a trader's 50 most recently closed positions that made money, plus their average buy prices."""
     closed = get("/closed-positions", user=wallet, limit=50,
@@ -346,6 +433,7 @@ def main():
     ap.add_argument("--recent-hours", type=int, default=48)
     ap.add_argument("--no-history", action="store_true")
     ap.add_argument("--no-us", action="store_true", help="skip the Polymarket US market list")
+    ap.add_argument("--no-kalshi", action="store_true", help="skip the Kalshi market list")
     ap.add_argument("--no-calls", action="store_true", help="do not log consensus calls to calls.json")
     ap.add_argument("--skip-resolve", action="store_true", help="log calls but do not check which have settled")
     args = ap.parse_args()
@@ -360,6 +448,9 @@ def main():
     us_idx = us_index(us_events)
     us_count = sum(len(e.get("markets") or []) for e in us_events)
     print(f"Polymarket US: {len(us_events)} open events, {us_count} markets (ok={us_ok})")
+    kal_markets, kal_ok = ([], False) if args.no_kalshi else fetch_kalshi_markets()
+    kal_idx = kalshi_index(kal_markets)
+    print(f"Kalshi: {len(kal_markets)} open markets (ok={kal_ok})")
     recent, exits = [], []
     for i, t in enumerate(leaders, 1):
         wallet = t["proxyWallet"]
@@ -372,6 +463,7 @@ def main():
         print(f"  {len(positions)} positions")
         values = [float(p.get("currentValue") or 0) for p in positions]
         typical = statistics.median(values) if values else 0
+        portfolio = sum(values)
         wr, wr_n, closed_avg = win_rate(wallet)
         held = {(p.get("conditionId"), p.get("outcome")): float(p.get("currentValue") or 0) for p in positions}
         entry = {**closed_avg, **{(p.get("conditionId"), p.get("outcome")): float(p.get("avgPrice") or 0)
@@ -391,7 +483,9 @@ def main():
             g = groups[(p["conditionId"], p["outcome"])]
             g.update(title=p.get("title"), slug=p.get("slug"), event_slug=p.get("eventSlug"), outcome=p["outcome"],
                      price=p.get("curPrice"), end=p.get("endDate"))
-            g["traders"].append({"name": name, "wallet": wallet, "value": round(value, 2)})
+            g["traders"].append({"name": name, "wallet": wallet, "value": round(value, 2),
+                                 "share": round(value / portfolio, 3) if portfolio else 0,
+                                 "heavy": bool(typical and value >= 3 * typical and value >= 500)})
             g["value"] += value
             g["invested"] += float(p.get("initialValue") or 0)
             g["cost"] += float(p.get("avgPrice") or 0) * float(p.get("size") or 0)
@@ -409,6 +503,8 @@ def main():
             "total_value": round(g["value"], 2),
             "invested": round(g["invested"], 2),
             "avg_entry": round(g["cost"] / g["shares"], 3) if g["shares"] else None,
+            "avg_share": round(sum(t["share"] for t in g["traders"]) / len(g["traders"]), 3),
+            "heavy": sum(1 for t in g["traders"] if t["heavy"]),
             "traders": sorted(g["traders"], key=lambda x: -x["value"]),
         })
     for r in rows:
@@ -419,6 +515,9 @@ def main():
         r["us"] = bool(m) if us_ok else None
         r["us_slug"] = m["slug"] if m else None
         r["us_path"] = m["path"] if m else None
+    for r in rows:
+        m = kalshi_match(kal_idx, r["title"]) if kal_ok else None
+        r["kalshi_url"] = m["url"] if m else None
     rows.sort(key=lambda r: (-r["trader_count"], -r["total_value"]))
     held = {(r["conditionId"], r["outcome"]): r for r in rows}
     for b in recent + exits:
@@ -429,6 +528,8 @@ def main():
         b["us"] = bool(m) if us_ok else None
         b["us_slug"] = m["slug"] if m else None
         b["us_path"] = m["path"] if m else None
+        m = kalshi_match(kal_idx, b["title"]) if kal_ok else None
+        b["kalshi_url"] = m["url"] if m else None
         b["category"] = classify(b["title"])
         b["league"] = (classify_league(b["title"]) or "Other sports") if b["category"] == "Sports" else None
     recent.sort(key=lambda b: -b["ts"])
@@ -445,6 +546,7 @@ def main():
     out = {"generated_at": datetime.now(timezone.utc).isoformat(),
            "trader_pool": len(leaders), "period": args.period, "category": args.category,
            "traders": trader_rows, "positions": rows, "recent": recent[:400], "exits": exits[:400],
+           "kalshi": {"ok": bool(kal_ok), "markets": len(kal_markets), "matched": sum(1 for r in rows if r.get("kalshi_url")), "total": len(rows)},
            "us": {"ok": bool(us_ok and us_events), "markets": us_count,
                   "matched": sum(1 for r in rows if r.get("us")), "total": len(rows)}}
     with open(args.out, "w") as f:
