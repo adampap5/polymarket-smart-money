@@ -216,8 +216,8 @@ th{font-weight:600;color:var(--mute);font-size:12px;background:var(--soft)}th:fi
           <datalist id="b-titles"></datalist>
           <label>Side<input type="text" id="b-side" list="b-sides" value="Yes" required></label>
           <datalist id="b-sides"><option value="Yes"><option value="No"></datalist>
-          <label>Price paid (¢ per contract)<input type="number" id="b-price" min="1" max="99" step="0.1" placeholder="e.g. 55" required></label>
-          <label>Contracts<input type="number" id="b-qty" min="1" step="1" placeholder="e.g. 100" required></label>
+          <label>Price paid (¢ per contract)<input type="number" id="b-price" min="0.01" max="99.99" step="0.01" placeholder="e.g. 55" required></label>
+          <label>Contracts<input type="number" id="b-qty" min="0.01" step="0.01" placeholder="e.g. 100" required></label>
           <button class="btn" type="submit">Add bet</button>
         </form>
         <div class="ds" id="b-msg"></div>
@@ -392,6 +392,8 @@ const LS = "smartmoney.mybets.v1";
 let myBets = [], betFilter = "all", pending = null, armed = null;
 function loadBets(){ try { const v = JSON.parse(localStorage.getItem(LS) || "[]"); myBets = Array.isArray(v) ? v.filter(b => b && b.title && b.p > 0) : []; } catch (e) { myBets = []; } }
 function saveBets(){ try { localStorage.setItem(LS, JSON.stringify(myBets)); $("b-warn").hidden = true; } catch (e) { $("b-warn").hidden = false; } }
+const r2 = x => Math.round(x * 100) / 100;
+const c2 = p => p == null ? "–" : (Math.round(p * 10000) / 100) + "¢";
 const usd = x => (x >= 0 ? "+" : "−") + money(Math.abs(x));
 const tone = x => x == null ? "" : x >= 0 ? "up" : "down";
 function nowPrice(b){
@@ -421,24 +423,24 @@ function renderBets(){
     const sellers = exitsBy[b.cid + "|" + String(b.side).toLowerCase()];
     return `<tr><td><span class="side-tag ${esc(b.side)}">${esc(String(b.side).toUpperCase())}</span> ${b.slug || b.es ? `<a href="https://polymarket.com/event/${esc(b.es || b.slug)}" target="_blank" rel="noopener">${esc(b.title)}</a>` : esc(b.title)}
         <div class="tags"><span class="tag">${b.kind === "real" ? "Real" : "Practice"} · ${esc(b.plat)}</span><span class="tag">${new Date(b.ts).toLocaleDateString()}</span></div></td>
-      <td>${cents(b.p)}</td><td>${b.qty}</td>
-      <td>${pos ? cents(n) : `<input class="nowin" type="number" min="1" max="99" step="0.1" data-cur="${b.id}" placeholder="¢" value="${b.cur != null ? Math.round(b.cur * 1000) / 10 : ""}" aria-label="Current price in cents">`}</td>
+      <td>${c2(b.p)}</td><td>${b.qty}</td>
+      <td>${pos ? cents(n) : `<input class="nowin" type="number" min="0.01" max="99.99" step="0.01" data-cur="${b.id}" placeholder="¢" value="${b.cur != null ? Math.round(b.cur * 10000) / 100 : ""}" aria-label="Current price in cents">`}</td>
       <td class="${tone(pl)}">${pl == null ? "–" : usd(pl) + " (" + pct((n - b.p) / b.p) + ")"}</td>
       <td>${pos ? `${pos.trader_count} still hold it` : "Not on the dashboard"}${sellers ? `<br><span class="pill down">${sellers.size} sold recently</span>` : ""}</td>
       <td><div class="acts"><button class="mini w" data-act="won" data-id="${b.id}">Won</button><button class="mini l" data-act="lost" data-id="${b.id}">Lost</button>
-        <input class="sellp" type="number" min="0" max="100" step="0.1" placeholder="Sold ¢" data-sp="${b.id}"><button class="mini" data-act="sold" data-id="${b.id}">Sold</button>
+        <input class="sellp" type="number" min="0" max="100" step="0.01" placeholder="Sold ¢" data-sp="${b.id}"><button class="mini" data-act="sold" data-id="${b.id}">Sold</button>
         <button class="mini x ${armed === b.id ? "armed" : ""}" data-act="del" data-id="${b.id}">${armed === b.id ? "Delete?" : "×"}</button></div></td></tr>`; }).join("") + "</tbody></table></div>"
     : `<div class="empty">${myBets.length ? "No open bets in this view." : "No bets yet. Add one above, or use “Log a bet” on the Top picks tab."}</div>`;
   $("b-done").innerHTML = done.length ? `<h3 class="sec">Settled</h3><div class="scroll"><table class="btable"><thead><tr><th>Bet</th><th>Paid</th><th>Contracts</th><th>Result</th><th>Profit / loss</th><th></th></tr></thead><tbody>` + done.sort((a, b) => (b.closed || 0) - (a.closed || 0)).map(b => {
     const v = b.st === "won" ? 1 : b.st === "lost" ? 0 : b.exit, pl = b.qty * (v - b.p);
     return `<tr><td><span class="side-tag ${esc(b.side)}">${esc(String(b.side).toUpperCase())}</span> ${esc(b.title)}<div class="tags"><span class="tag">${b.kind === "real" ? "Real" : "Practice"} · ${esc(b.plat)}</span></div></td>
-      <td>${cents(b.p)}</td><td>${b.qty}</td><td>${b.st === "sold" ? "Sold at " + cents(b.exit) : b.st === "won" ? "Won" : "Lost"}</td><td class="${tone(pl)}">${usd(pl)} (${pct((v - b.p) / b.p)})</td>
+      <td>${c2(b.p)}</td><td>${b.qty}</td><td>${b.st === "sold" ? "Sold at " + c2(b.exit) : b.st === "won" ? "Won" : "Lost"}</td><td class="${tone(pl)}">${usd(pl)} (${pct((v - b.p) / b.p)})</td>
       <td><div class="acts"><button class="mini x ${armed === b.id ? "armed" : ""}" data-act="del" data-id="${b.id}">${armed === b.id ? "Delete?" : "×"}</button></div></td></tr>`; }).join("") + "</tbody></table></div>" : "";
 }
 function addBet(e){
   e.preventDefault();
-  const title = $("b-title").value.trim(), side = $("b-side").value.trim(), p = +$("b-price").value / 100, qty = +$("b-qty").value;
-  if (!title || !side || !(p > 0 && p < 1) || !(qty >= 1)) { $("b-msg").textContent = "Fill in the market, side, a price between 1 and 99¢, and the number of contracts."; return; }
+  const title = $("b-title").value.trim(), side = $("b-side").value.trim(), p = r2(+$("b-price").value) / 100, qty = r2(+$("b-qty").value);
+  if (!title || !side || !(p > 0 && p < 1) || !(qty >= 0.01)) { $("b-msg").textContent = "Fill in the market, side, a price between 1 and 99¢, and the number of contracts."; return; }
   const hit = (pending && pending.title === title) ? pending : (raw.positions || []).find(x => x.title === title && String(x.outcome).toLowerCase() === side.toLowerCase());
   myBets.push({id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6), ts: Date.now(), kind: $("b-kind").value, plat: $("b-plat").value, title, side, p, qty,
     cid: hit ? hit.conditionId : null, slug: hit ? hit.slug : null, es: hit ? hit.event_slug : null, st: "open"});
@@ -448,7 +450,7 @@ function addBet(e){
 }
 function logFromPick(i){
   const r = pickReg[i]; if (!r) return;
-  $("b-title").value = r.title; $("b-side").value = r.outcome; $("b-price").value = r.price != null ? Math.round(r.price * 1000) / 10 : ""; $("b-qty").value = "";
+  $("b-title").value = r.title; $("b-side").value = r.outcome; $("b-price").value = r.price != null ? Math.round(r.price * 10000) / 100 : ""; $("b-qty").value = "";
   pending = {title: r.title, conditionId: r.conditionId, outcome: r.outcome, slug: r.slug, event_slug: r.event_slug};
   $("b-msg").textContent = "Filled in from the pick. Set the type, where you bet and how many contracts, then add it.";
   show("b"); renderBets(); $("b-qty").focus();
@@ -459,7 +461,7 @@ function betAction(act, id, root){
   armed = null;
   if (act === "won") { b.st = "won"; b.closed = Date.now(); }
   else if (act === "lost") { b.st = "lost"; b.closed = Date.now(); }
-  else if (act === "sold") { const v = parseFloat((root.querySelector(`[data-sp="${id}"]`) || {}).value); if (!(v >= 0 && v <= 100)) { $("b-msg").textContent = "Type the price you sold at, in cents, next to Sold."; return; } b.st = "sold"; b.exit = v / 100; b.closed = Date.now(); }
+  else if (act === "sold") { const v = parseFloat((root.querySelector(`[data-sp="${id}"]`) || {}).value); if (!(v >= 0 && v <= 100)) { $("b-msg").textContent = "Type the price you sold at, in cents, next to Sold."; return; } b.st = "sold"; b.exit = r2(v) / 100; b.closed = Date.now(); }
   saveBets(); renderBets();
 }
 function bindBets(){
@@ -467,11 +469,11 @@ function bindBets(){
   $("b-title").addEventListener("input", () => { if (pending && pending.title !== $("b-title").value) pending = null; });
   $("b-filter").addEventListener("click", e => { const x = e.target.closest && e.target.closest("[data-bf]"); if (x) { betFilter = x.dataset.bf; renderBets(); } });
   $("bets").addEventListener("click", e => { const x = e.target.closest && e.target.closest("[data-act]"); if (x) betAction(x.dataset.act, x.dataset.id, $("bets")); });
-  $("bets").addEventListener("change", e => { const t = e.target; if (t && t.dataset && t.dataset.cur) { const b = myBets.find(y => y.id === t.dataset.cur); const v = parseFloat(t.value); if (b) { b.cur = v > 0 && v < 100 ? v / 100 : null; saveBets(); renderBets(); } } });
+  $("bets").addEventListener("change", e => { const t = e.target; if (t && t.dataset && t.dataset.cur) { const b = myBets.find(y => y.id === t.dataset.cur); const v = parseFloat(t.value); if (b) { b.cur = v > 0 && v < 100 ? r2(v) / 100 : null; saveBets(); renderBets(); } } });
   $("p-list").addEventListener("click", e => { const x = e.target.closest && e.target.closest("[data-log]"); if (x) logFromPick(+x.dataset.log); });
   $("b-dl").addEventListener("click", () => { const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([JSON.stringify(myBets, null, 1)], {type: "application/json"})); a.download = "my-bets-backup.json"; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 1000); });
   $("b-restore").addEventListener("change", e => { const f = e.target.files && e.target.files[0]; if (!f) return; const rd = new FileReader();
-    rd.onload = () => { try { const v = JSON.parse(rd.result); if (!Array.isArray(v)) throw 0; const ok = v.filter(b => b && b.title && b.p > 0 && b.qty >= 1 && b.id); const have = new Set(myBets.map(b => b.id)); myBets = myBets.concat(ok.filter(b => !have.has(b.id))); saveBets(); $("b-msg").textContent = `Restored ${ok.length} bet${ok.length === 1 ? "" : "s"}.`; renderBets(); } catch (x) { $("b-msg").textContent = "That file isn’t a backup from this page."; } };
+    rd.onload = () => { try { const v = JSON.parse(rd.result); if (!Array.isArray(v)) throw 0; const ok = v.filter(b => b && b.title && b.p > 0 && b.qty > 0 && b.id); const have = new Set(myBets.map(b => b.id)); myBets = myBets.concat(ok.filter(b => !have.has(b.id))); saveBets(); $("b-msg").textContent = `Restored ${ok.length} bet${ok.length === 1 ? "" : "s"}.`; renderBets(); } catch (x) { $("b-msg").textContent = "That file isn’t a backup from this page."; } };
     rd.readAsText(f); e.target.value = ""; });
   ["p-mode", "p-min"].forEach(id => $(id).addEventListener("input", renderPicks));
 }
