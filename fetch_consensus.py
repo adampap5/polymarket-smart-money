@@ -318,6 +318,19 @@ def load_calls():
         return {"started": datetime.now(timezone.utc).isoformat(timespec="minutes"), "calls": {}}
 
 
+def contested(r, rows):
+    """True when top traders are split across the sides of this market (neither side has 70% of the people or money)."""
+    mine = {t["wallet"] for t in r["traders"]}
+    opp, oppv = set(), 0.0
+    for o in rows:
+        if o["conditionId"] == r["conditionId"] and o is not r:
+            opp |= {t["wallet"] for t in o["traders"]}
+            oppv += o["total_value"]
+    if not opp:
+        return False
+    return len(mine) / (len(mine) + len(opp)) < 0.7 or r["total_value"] / max(1.0, r["total_value"] + oppv) < 0.7
+
+
 def update_calls(store, rows, pool):
     """Log every market side the first time 3, 5 and 8 top traders hold it, with the price at that moment."""
     now = int(time.time())
@@ -326,6 +339,8 @@ def update_calls(store, rows, pool):
         n, p = r["trader_count"], r.get("price")
         if n < TIERS[0] or p is None or not (0.05 <= p <= 0.95):
             continue   # skip near-settled prices, where "agreement" tells you nothing
+        if contested(r, rows):
+            continue   # top traders are on both sides, so this is not a real consensus
         key = f"{pool}|{r['conditionId']}|{r['outcome']}"
         c = store["calls"].get(key)
         if c is None:

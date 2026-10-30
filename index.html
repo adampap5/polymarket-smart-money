@@ -175,6 +175,8 @@ th{font-weight:600;color:var(--mute);font-size:12px;background:var(--soft)}th:fi
     <div id="src"></div>
     <div class="sect">Where you can bet</div>
     <div id="us"></div>
+    <div class="sect">Contested bets</div>
+    <div id="spl"></div>
     <details class="promo"><summary>How to read this</summary><ul>
       <li>Each row is <b>one side of one market</b>. YES means they bet it happens, NO means they don’t.</li>
       <li><b>Top traders</b> is how many tracked earners hold that side.</li>
@@ -341,7 +343,7 @@ const chg = (v, i) => i ? v / i - 1 : null;
 const pct = x => `${x >= 0 ? "+" : "−"}${Math.abs(Math.round(x * 100))}%`;
 const pnlPill = x => x == null ? `<span class="pill gray">–</span>` : `<span class="pill ${x >= 0 ? "" : "down"}">${pct(x)}</span>`;
 const niceMax = m => { if (!(m > 0)) return 1; const mag = 10 ** Math.floor(Math.log10(m)); return [1,2,2.5,5,10].map(k => k * mag).find(v => v >= m); };
-let data, raw, usOn = false, cat = "All", league = "All", file = "data.json"; const cache = {};
+let hideSplit = true, data, raw, usOn = false, cat = "All", league = "All", file = "data.json"; const cache = {};
 const SRC = [["data.json","Top overall earners"],["data_sports.json","Top sports earners"]];
 const TITLES = {p: "Top picks", b: "My bets", m: "Markets", f: "New bets", x: "Exits", c: "Calendar", r: "Track record", t: "Top traders"};
 
@@ -354,7 +356,8 @@ const clamp = (x, a, b) => Math.min(b, Math.max(a, x));
 let pickReg = [];
 function pickScore(r){
   const N = data.trader_pool, parts = [];
-  parts.push({k: "Agreement", pts: 35 * Math.min(r.trader_count, 10) / 10, max: 35, why: `${r.trader_count} of ${N} top traders hold this side`});
+  const opp = r.sp ? r.sp.opp : 0, net = Math.max(0, r.trader_count - opp);
+  parts.push({k: "Agreement", pts: 35 * Math.min(net, 10) / 10, max: 35, why: opp ? `${r.trader_count} top traders hold this side, ${opp} hold the other (net ${net})` : `${r.trader_count} of ${N} top traders hold this side, none on the other`});
   const hv = r.heavy || 0;
   parts.push({k: "Big positions", pts: 25 * Math.min(hv, 4) / 4, max: 25, why: r.heavy == null ? "Run the Update data job to see this" : hv ? `${hv} of them hold 3× or more their usual position size` : "No unusually large positions"});
   const av = r.avg_share;
@@ -380,7 +383,7 @@ function renderPicks(){
     const d = daysLeft(r.end), when = d == null ? "" : d < 1 ? "Closes today" : `Closes in ${Math.ceil(d)}d`;
     return `<div class="pick"><div class="score ${s.score >= 70 ? "hi" : s.score >= 50 ? "mid" : "lo"}"><b>${s.score}</b><span>score</span></div>
       <div class="pm"><div class="t"><span class="side-tag ${esc(r.outcome)}">${esc(r.outcome).toUpperCase()}</span>${lnk(r, esc(r.title))}</div>
-        <div class="tags">${tag(r)}${when ? `<span class="tag ${d != null && d <= 7 ? "soon" : ""}">${when}</span>` : ""}</div>
+        <div class="tags">${tag(r)}${spTag(r)}${when ? `<span class="tag ${d != null && d <= 7 ? "soon" : ""}">${when}</span>` : ""}</div>
         <ul class="why">${s.parts.map(p => `<li class="${p.pts >= p.max * 0.6 ? "good" : ""}">${esc(p.why)}</li>`).join("")}</ul>
         <details><summary>How the score is built</summary><table><thead><tr><th>Part</th><th>Points</th></tr></thead><tbody>${s.parts.map(p => `<tr><td>${esc(p.k)}</td><td>${p.pts.toFixed(1)} / ${p.max}</td></tr>`).join("")}</tbody></table></details></div>
       <div class="pa">${bet(r)}<button class="mini" data-log="${i}">Log a bet</button></div></div>`; }).join("")
@@ -616,7 +619,7 @@ function render(){
     const when = d == null ? "" : d < 0 ? "Closed" : d < 1 ? "Closes today" : `Closes in ${Math.ceil(d)}d`;
     return `<details class="mrow"><summary>
       <div><div class="t"><span class="side-tag ${esc(r.outcome)}">${esc(r.outcome).toUpperCase()}</span>${lnk(r, esc(r.title))}</div>
-        <div class="tags"><span class="tag">${esc(r.category)}${r.league ? " · " + esc(r.league) : ""}</span>${r.us ? '<span class="pill">On Polymarket US</span>' : ""}${when ? `<span class="tag ${d != null && d >= 0 && d <= 7 ? "soon" : ""}">${when}</span>` : ""}</div></div>
+        <div class="tags"><span class="tag">${esc(r.category)}${r.league ? " · " + esc(r.league) : ""}</span>${r.us ? '<span class="pill">On Polymarket US</span>' : ""}${spTag(r)}${when ? `<span class="tag ${d != null && d >= 0 && d <= 7 ? "soon" : ""}">${when}</span>` : ""}</div></div>
       <div><span class="lbl">Top traders</span><div class="agree"><div class="meter"><i style="width:${r.trader_count / data.trader_pool * 100}%"></i></div><b>${r.trader_count}</b><span>/${data.trader_pool}</span></div></div>
       <div class="cell"><span class="lbl">Worth now</span><b>${money(r.total_value)}</b><small>${r.invested ? "from " + money(r.invested) : ""}</small></div>
       <div class="cell"><span class="lbl">Price</span><b>${cents(r.price)}</b><small>avg buy ${cents(r.avg_entry)}</small></div>
@@ -809,6 +812,25 @@ document.addEventListener("click", e => {
 });
 window.addEventListener("scroll", hideTip, true);
 
+/* A bet is "split" when top traders are on both sides of the same market, so agreement on one side means little. */
+function computeSplits(rows){
+  const byC = {};
+  rows.forEach(r => (byC[r.conditionId] = byC[r.conditionId] || []).push(r));
+  rows.forEach(r => {
+    const mine = new Set((r.traders || []).map(t => t.wallet)), oppW = new Set();
+    let oppV = 0;
+    (byC[r.conditionId] || []).forEach(o => { if (o !== r) { oppV += o.total_value || 0; (o.traders || []).forEach(t => oppW.add(t.wallet)); } });
+    const opp = oppW.size, both = [...mine].filter(w => oppW.has(w)).length;
+    const leanP = mine.size / Math.max(1, mine.size + opp), leanD = r.total_value / Math.max(1, r.total_value + oppV);
+    r.sp = {opp, oppV, both, leanP, leanD, split: opp > 0 && (leanP < 0.7 || leanD < 0.7)};
+  });
+}
+const spTag = r => !r.sp || !r.sp.opp ? "" : r.sp.split ? `<span class="pill soon" title="Top traders are on both sides of this market, so agreement here tells you little">Split ${r.trader_count} vs ${r.sp.opp}</span>` : `<span class="tag" title="Top traders holding the other side">${r.sp.opp} on the other side</span>`;
+function renderSplit(){
+  const n = raw.positions.filter(p => p.sp && p.sp.split).length;
+  $("spl").innerHTML = `<button class="nav" id="splbtn" aria-pressed="${hideSplit}">Hide split decisions</button><div class="usnote">${n} of ${raw.positions.length} sides are on markets where top traders disagree (neither side has 70% of the traders or the money). They’re ${hideSplit ? "hidden" : "shown, marked “Split”"}.</div>`;
+  $("splbtn").onclick = () => { hideSplit = !hideSplit; apply(); };
+}
 function renderUs(){
   const u = raw.us, can = !!(u && u.ok && u.matched > 0);
   $("us").innerHTML = `<button class="nav" id="usbtn" aria-pressed="${usOn}" ${can ? "" : "disabled"}>Polymarket US only</button><div class="usnote">${
@@ -820,11 +842,13 @@ function renderUs(){
 function apply(){
   const d = raw;
   $("drawer").hidden = true; $("scrim").hidden = true;
+  computeSplits(d.positions);
   data = usOn ? {...d, positions: d.positions.filter(p => p.us), recent: (d.recent || []).filter(b => b.us), exits: (d.exits || []).filter(b => b.us)} : d;
+  if (hideSplit) data = {...data, positions: data.positions.filter(p => !(p.sp && p.sp.split))};
   const max = Math.max(1, ...data.positions.map(p => p.trader_count));
   $("min").max = max; $("min").value = Math.min(3, max);
   $("meta").textContent = `Tracking the top ${d.trader_pool} ${file.includes("sports") ? "sports " : ""}earners of the past ${d.period.toLowerCase()} · Updated ${new Date(d.generated_at).toLocaleString()}`;
-  renderUs(); renderCards(); renderSide(); renderChips(); renderLeagues(); render(); renderTraders(); renderFeedFilters(); renderFeed();
+  renderUs(); renderSplit(); renderCards(); renderSide(); renderChips(); renderLeagues(); render(); renderTraders(); renderFeedFilters(); renderFeed();
   renderExitFilters(); renderExits(); renderCalFilters(); calDay = null; renderCal(); renderRec(); renderPicks(); renderBets();
 }
 
