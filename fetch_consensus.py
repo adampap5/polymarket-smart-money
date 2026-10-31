@@ -117,6 +117,60 @@ def recent_trades(wallet, name, hours, typical, held, entry):
     return buys, sells
 
 
+GAMMA_SEARCH = "https://gamma-api.polymarket.com/public-search"
+
+
+def find_wallet(name, leaders):
+    """Look up a Polymarket user's wallet by username: the leaderboard first, then Polymarket's public profile search."""
+    want = name.strip().lower()
+    for t in leaders:
+        if str(t.get("userName") or "").lower() == want:
+            return t["proxyWallet"]
+    try:
+        qs = urllib.parse.urlencode({"q": name, "search_profiles": "true", "limit_per_type": 10})
+        req = urllib.request.Request(f"{GAMMA_SEARCH}?{qs}", headers={"User-Agent": "consensus-dashboard/0.2"})
+        with urllib.request.urlopen(req, timeout=30) as r:
+            found = json.load(r)
+        for p in (found.get("profiles") or []):
+            if want in (str(p.get("name") or "").lower(), str(p.get("pseudonym") or "").lower()) and p.get("proxyWallet"):
+                return p["proxyWallet"]
+    except Exception as e:
+        print(f"  profile search failed for {name}: {e}")
+    return None
+
+
+def watch_user(name, leaders, days=7):
+    """Every trade a watched user made in the last few days (no minimum size), newest first."""
+    wallet = find_wallet(name, leaders)
+    out = {"name": name, "wallet": wallet, "found": bool(wallet), "checked_at": int(time.time()), "trades": []}
+    if not wallet:
+        return out
+    since = time.time() - days * 86400
+    acts = get("/activity", user=wallet, type="TRADE", limit=500)
+    merged = {}
+    for a in acts if isinstance(acts, list) else []:
+        side = a.get("side")
+        if side not in ("BUY", "SELL") or float(a.get("timestamp") or 0) < since:
+            continue
+        usd = float(a.get("usdcSize") or 0) or float(a.get("size") or 0) * float(a.get("price") or 0)
+        k = (side, a.get("conditionId"), a.get("outcome"))
+        m = merged.setdefault(k, {"side": side, "conditionId": a.get("conditionId"), "outcome": a.get("outcome"),
+                                  "title": a.get("title"), "slug": a.get("slug"), "event_slug": a.get("eventSlug"),
+                                  "usd": 0.0, "shares": 0.0, "n": 0, "ts": 0})
+        m["usd"] += usd
+        m["shares"] += float(a.get("size") or 0)
+        m["n"] += 1
+        m["ts"] = max(m["ts"], int(float(a.get("timestamp") or 0)))
+    for m in merged.values():
+        m["price"] = round(m["usd"] / m["shares"], 3) if m["shares"] else None
+        m["usd"] = round(m["usd"])
+        del m["shares"]
+        out["trades"].append(m)
+    out["trades"].sort(key=lambda m: -m["ts"])
+    out["trades"] = out["trades"][:40]
+    return out
+
+
 US_GATEWAY = "https://gateway.polymarket.us/v1/events"
 
 
@@ -446,6 +500,7 @@ def main():
     ap.add_argument("--min-value", type=float, default=50)
     ap.add_argument("--out", default="data.json")
     ap.add_argument("--recent-hours", type=int, default=48)
+    ap.add_argument("--watch", default="", help="Polymarket username to watch; writes watch.json")
     ap.add_argument("--no-history", action="store_true")
     ap.add_argument("--no-us", action="store_true", help="skip the Polymarket US market list")
     ap.add_argument("--no-kalshi", action="store_true", help="skip the Kalshi market list")
@@ -575,6 +630,11 @@ def main():
                   "matched": sum(1 for r in rows if r.get("us")), "total": len(rows)}}
     with open(args.out, "w") as f:
         json.dump(out, f)
+    if args.watch:
+        w = watch_user(args.watch, leaders)
+        with open("watch.json", "w") as f:
+            json.dump(w, f)
+        print(f"watch.json: {args.watch} -> {'wallet found' if w['found'] else 'NOT FOUND'}, {len(w['trades'])} trades in the last 7 days")
     if not args.no_history:
         update_history(rows)
     print(f"Wrote {args.out} with {len(rows)} position groups")

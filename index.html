@@ -157,6 +157,9 @@ th{font-weight:600;color:var(--mute);font-size:12px;background:var(--soft)}th:fi
 .btable td,.btable th{font-size:13px;vertical-align:top}.btable td:nth-child(1),.btable th:nth-child(1){text-align:left;min-width:220px}
 .btable td:last-child,.btable th:last-child{text-align:right}
 .acts{display:flex;gap:5px;flex-wrap:wrap;justify-content:flex-end;align-items:center}
+.watch{display:flex;gap:14px;align-items:flex-start;background:var(--warn);border:1px solid #f2dfa5;color:#4d3500;border-radius:16px;padding:12px 16px;margin:0 0 14px}
+.watch b.hd{display:block;font-size:14px}.watch .wl{flex:1;min-width:0}.watch .wi{display:flex;flex-wrap:wrap;gap:6px 10px;align-items:center;margin-top:6px;font-size:13px}
+.watch .wi a{color:inherit;font-weight:700}.watch button.x{font:inherit;font-size:12px;font-weight:700;border:1px solid #e3c978;background:#fff;border-radius:8px;padding:3px 10px;cursor:pointer;color:#4d3500;flex:none}
 </style>
 </head>
 <body>
@@ -193,6 +196,7 @@ th{font-weight:600;color:var(--mute);font-size:12px;background:var(--soft)}th:fi
       <div><h1 id="title">Markets</h1><p class="sub" id="meta">Loading…</p></div>
       <label class="search" aria-label="Search markets"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="6.5"/><path d="m20 20-4-4"/></svg><input type="text" id="q" placeholder="Search markets"></label>
     </header>
+    <div id="watch" hidden></div>
 
     <section id="picks">
       <div class="panel">
@@ -201,6 +205,7 @@ th{font-weight:600;color:var(--mute);font-size:12px;background:var(--soft)}th:fi
           <label>Show<select id="p-mode"><option value="conf">All sports + confident bets elsewhere</option><option value="sports">Sports only</option><option value="all">Everything</option></select></label>
           <label>Minimum traders on a side<select id="p-min"><option value="1">1</option><option value="2" selected>2</option><option value="3">3</option><option value="5">5</option></select></label>
         </div>
+        <p class="note" id="p-watch" style="margin:10px 0 0"></p>
         <div id="p-list"></div>
       </div>
     </section>
@@ -379,6 +384,7 @@ function renderPicks(){
     return true;
   }).map(r => ({r, s: pickScore(r)})).sort((a, b) => b.s.score - a.s.score || b.r.trader_count - a.r.trader_count).slice(0, 12);
   pickReg = rows.map(x => x.r);
+  $("p-watch").textContent = watchLine();
   $("p-list").innerHTML = rows.length ? rows.map(({r, s}, i) => {
     const d = daysLeft(r.end), when = d == null ? "" : d < 1 ? "Closes today" : `Closes in ${Math.ceil(d)}d`;
     return `<div class="pick"><div class="score ${s.score >= 70 ? "hi" : s.score >= 50 ? "mid" : "lo"}"><b>${s.score}</b><span>score</span></div>
@@ -479,6 +485,28 @@ function bindBets(){
     rd.onload = () => { try { const v = JSON.parse(rd.result); if (!Array.isArray(v)) throw 0; const ok = v.filter(b => b && b.title && b.p > 0 && b.qty > 0 && b.id); const have = new Set(myBets.map(b => b.id)); myBets = myBets.concat(ok.filter(b => !have.has(b.id))); saveBets(); $("b-msg").textContent = `Restored ${ok.length} bet${ok.length === 1 ? "" : "s"}.`; renderBets(); } catch (x) { $("b-msg").textContent = "That file isn’t a backup from this page."; } };
     rd.readAsText(f); e.target.value = ""; });
   ["p-mode", "p-min"].forEach(id => $(id).addEventListener("input", renderPicks));
+}
+
+/* ---------- Watched user alert ---------- */
+let watchData = null;
+const WSEEN = "smartmoney.watchseen.v1";
+function seenTs(){ try { return +localStorage.getItem(WSEEN) || 0; } catch (e) { return 0; } }
+function renderWatch(){
+  const el = $("watch"), w = watchData;
+  if (!w || !w.found || !w.trades || !w.trades.length) { el.hidden = true; return; }
+  const seen = seenTs(), fresh = w.trades.filter(t => t.ts > seen && t.ts >= Date.now() / 1000 - 48 * 3600);
+  if (!fresh.length) { el.hidden = true; return; }
+  el.innerHTML = `<div class="wl"><b class="hd">🔔 ${esc(w.name)} just made ${fresh.length === 1 ? "a bet" : fresh.length + " bets"}</b>` +
+    fresh.slice(0, 6).map(t => `<div class="wi"><span>${ago(t.ts)}</span><b>${t.side === "BUY" ? "Bought" : "Sold"}</b><span class="side-tag ${esc(t.outcome)}">${esc(String(t.outcome).toUpperCase())}</span><a href="https://polymarket.com/event/${esc(t.event_slug || t.slug || "")}" target="_blank" rel="noopener">${esc(t.title)}</a><span>${money(t.usd)}${t.price != null ? " at " + cents(t.price) : ""}</span>${t.side === "BUY" ? bet(t) : ""}</div>`).join("") +
+    `${fresh.length > 6 ? `<div class="wi">+ ${fresh.length - 6} more</div>` : ""}</div><button class="x" id="wdismiss" type="button">Dismiss</button>`;
+  el.hidden = false;
+  $("wdismiss").onclick = () => { try { localStorage.setItem(WSEEN, String(Math.max(...w.trades.map(t => t.ts)))); } catch (e) {} el.hidden = true; };
+}
+function watchLine(){
+  const w = watchData; if (!w) return "";
+  if (!w.found) return `Watching ${w.name}: couldn’t find a Polymarket user with that name.`;
+  const t = w.trades && w.trades[0];
+  return `Watching ${w.name}: ${t ? "last bet " + ago(t.ts) : "no bets in the last 7 days"}. Checked ${ago(w.checked_at)}.`;
 }
 
 function renderSrc(){
@@ -849,7 +877,7 @@ function apply(){
   $("min").max = max; $("min").value = Math.min(3, max);
   $("meta").textContent = `Tracking the top ${d.trader_pool} ${file.includes("sports") ? "sports " : ""}earners of the past ${d.period.toLowerCase()} · Updated ${new Date(d.generated_at).toLocaleString()}`;
   renderUs(); renderSplit(); renderCards(); renderSide(); renderChips(); renderLeagues(); render(); renderTraders(); renderFeedFilters(); renderFeed();
-  renderExitFilters(); renderExits(); renderCalFilters(); calDay = null; renderCal(); renderRec(); renderPicks(); renderBets();
+  renderExitFilters(); renderExits(); renderCalFilters(); calDay = null; renderCal(); renderRec(); renderPicks(); renderBets(); renderWatch();
 }
 
 function load(f){
@@ -871,6 +899,7 @@ $("c-days").addEventListener("click", e => { const b = e.target.closest && e.tar
 $("r-body").addEventListener("click", e => { const b = e.target.closest && e.target.closest("[data-tier]"); if (b) { recTier = b.dataset.tier; renderRec(); } });
 Object.keys(SECTIONS).forEach(k => { $("t-" + k).onclick = () => show(k); });
 fetch("calls.json").then(r => { if (!r.ok) throw 0; return r.json(); }).then(d => { calls = d; if (raw) renderRec(); }).catch(() => { calls = null; if (raw) renderRec(); });
+fetch("watch.json").then(r => { if (!r.ok) throw 0; return r.json(); }).then(d => { watchData = d; if (raw) { renderWatch(); renderPicks(); } }).catch(() => {});
 loadBets(); bindBets();
 $("seeall").onclick = () => show("f");
 show("p");
