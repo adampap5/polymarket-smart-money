@@ -160,6 +160,10 @@ th{font-weight:600;color:var(--mute);font-size:12px;background:var(--soft)}th:fi
 .watch{display:flex;gap:14px;align-items:flex-start;background:var(--warn);border:1px solid #f2dfa5;color:#4d3500;border-radius:16px;padding:12px 16px;margin:0 0 14px}
 .watch b.hd{display:block;font-size:14px}.watch .wl{flex:1;min-width:0}.watch .wi{display:flex;flex-wrap:wrap;gap:6px 10px;align-items:center;margin-top:6px;font-size:13px}
 .watch .wi a{color:inherit;font-weight:700}.watch button.x{font:inherit;font-size:12px;font-weight:700;border:1px solid #e3c978;background:#fff;border-radius:8px;padding:3px 10px;cursor:pointer;color:#4d3500;flex:none}
+.livedot{margin-left:auto;font-size:11px;font-weight:800;background:var(--red);color:#fff;border-radius:99px;padding:0 7px;line-height:18px}
+.lv{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--red);margin-right:6px;animation:pl 1.4s infinite}@keyframes pl{50%{opacity:.3}}
+.lrow{display:grid;grid-template-columns:minmax(0,1fr) 130px 90px auto;gap:6px 16px;padding:14px 4px;border-bottom:1px solid var(--line);align-items:center}.lrow:last-child{border-bottom:0}
+@media(max-width:820px){.lrow{grid-template-columns:1fr 1fr}.lrow>:first-child{grid-column:1/3}}
 </style>
 </head>
 <body>
@@ -167,6 +171,7 @@ th{font-weight:600;color:var(--mute);font-size:12px;background:var(--soft)}th:fi
   <aside class="side">
     <div class="brand"><span class="logo"></span>Smart Money</div>
     <button class="nav" id="t-p" aria-selected="true"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m12 3 2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1-4.4-4.3 6.1-.9z"/></svg>Top picks</button>
+    <button class="nav" id="t-l" aria-selected="false"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M6.3 6.3a8 8 0 0 0 0 11.4M17.7 6.3a8 8 0 0 1 0 11.4"/></svg>Live games<span class="livedot" id="livecount" hidden></span></button>
     <button class="nav" id="t-m" aria-selected="false"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h7v7H4zM13 4h7v7h-7zM4 13h7v7H4zM13 13h7v7h-7z"/></svg>Markets</button>
     <button class="nav" id="t-f" aria-selected="false"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2 4 14h7l-1 8 9-12h-7z"/></svg>New bets</button>
     <button class="nav" id="t-x" aria-selected="false"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10 4H5v16h5M15 8l4 4-4 4M19 12H9"/></svg>Exits</button>
@@ -200,13 +205,21 @@ th{font-weight:600;color:var(--mute);font-size:12px;background:var(--soft)}th:fi
 
     <section id="picks">
       <div class="panel">
-        <p class="note">The best current ideas, ranked by a <b>conviction score</b> out of 100: how many top traders agree, how big their positions are for them, how much of their money is on it, and whether the price still has room. The weights are my judgment and haven’t been tested. The Track record tab shows over time whether agreement pays.</p>
+        <p class="note">Bets on games that haven’t started (live games have their own tab). The best current ideas, ranked by a <b>conviction score</b> out of 100: how many top traders agree, how big their positions are for them, how much of their money is on it, and whether the price still has room. The weights are my judgment and haven’t been tested. The Track record tab shows over time whether agreement pays.</p>
         <div class="ctl" style="margin-top:0">
           <label>Show<select id="p-mode"><option value="conf">All sports + confident bets elsewhere</option><option value="sports">Sports only</option><option value="all">Everything</option></select></label>
           <label>Minimum traders on a side<select id="p-min"><option value="1">1</option><option value="2" selected>2</option><option value="3">3</option><option value="5">5</option></select></label>
         </div>
         <p class="note" id="p-watch" style="margin:10px 0 0"></p>
         <div id="p-list"></div>
+      </div>
+    </section>
+
+    <section id="live" hidden>
+      <div class="panel">
+        <p class="note"><span class="lv"></span>Games that have <b>already started</b> and haven’t settled. These are kept apart from every other tab, which only show bets on games that haven’t started yet. Top traders’ positions here were often taken before the game began, and prices move fast. This page updates about once an hour, so the price shown can be well out of date. Check the live price before betting.</p>
+        <div class="ctl" style="margin-top:0"><label>Minimum traders on a side<select id="l-min"><option value="1">1</option><option value="2" selected>2</option><option value="3">3</option><option value="5">5</option></select></label></div>
+        <div id="l-list"></div>
       </div>
     </section>
 
@@ -350,7 +363,7 @@ const pnlPill = x => x == null ? `<span class="pill gray">–</span>` : `<span c
 const niceMax = m => { if (!(m > 0)) return 1; const mag = 10 ** Math.floor(Math.log10(m)); return [1,2,2.5,5,10].map(k => k * mag).find(v => v >= m); };
 let hideSplit = true, data, raw, usOn = false, cat = "All", league = "All", file = "data.json"; const cache = {};
 const SRC = [["data.json","Top overall earners"],["data_sports.json","Top sports earners"]];
-const TITLES = {p: "Top picks", b: "My bets", m: "Markets", f: "New bets", x: "Exits", c: "Calendar", r: "Track record", t: "Top traders"};
+const TITLES = {l: "Live games", p: "Top picks", b: "My bets", m: "Markets", f: "New bets", x: "Exits", c: "Calendar", r: "Track record", t: "Top traders"};
 
 /* ---------- Kalshi link ---------- */
 const kalUrl = o => o.kalshi_url || "https://www.google.com/search?q=" + encodeURIComponent("site:kalshi.com " + (o.title || ""));
@@ -485,6 +498,7 @@ function bindBets(){
     rd.onload = () => { try { const v = JSON.parse(rd.result); if (!Array.isArray(v)) throw 0; const ok = v.filter(b => b && b.title && b.p > 0 && b.qty > 0 && b.id); const have = new Set(myBets.map(b => b.id)); myBets = myBets.concat(ok.filter(b => !have.has(b.id))); saveBets(); $("b-msg").textContent = `Restored ${ok.length} bet${ok.length === 1 ? "" : "s"}.`; renderBets(); } catch (x) { $("b-msg").textContent = "That file isn’t a backup from this page."; } };
     rd.readAsText(f); e.target.value = ""; });
   ["p-mode", "p-min"].forEach(id => $(id).addEventListener("input", renderPicks));
+  $("l-min").addEventListener("input", renderLive);
 }
 
 /* ---------- Watched user alert ---------- */
@@ -808,7 +822,7 @@ function renderRec(){
     ${catTable}${doneList}${openList}`;
 }
 
-const SECTIONS = {p: "picks", b: "bets", m: "markets", f: "feed", x: "exits", c: "cal", r: "rec", t: "traders"};
+const SECTIONS = {l: "live", p: "picks", b: "bets", m: "markets", f: "feed", x: "exits", c: "cal", r: "rec", t: "traders"};
 function show(tab){
   Object.entries(SECTIONS).forEach(([k, id]) => { $(id).hidden = tab !== k; $("t-" + k).setAttribute("aria-selected", tab === k); });
   $("title").textContent = TITLES[tab];
@@ -859,6 +873,27 @@ function renderSplit(){
   $("spl").innerHTML = `<button class="nav" id="splbtn" aria-pressed="${hideSplit}">Hide split decisions</button><div class="usnote">${n} of ${raw.positions.length} sides are on markets where top traders disagree (neither side has 70% of the traders or the money). They’re ${hideSplit ? "hidden" : "shown, marked “Split”"}.</div>`;
   $("splbtn").onclick = () => { hideSplit = !hideSplit; apply(); };
 }
+const LIVE_HOURS = 8;   // a game this long after its start is treated as finished
+function phase(r){
+  if (!r.start) return "pre";
+  const t = Date.parse(r.start); if (isNaN(t)) return "pre";
+  const h = (Date.now() - t) / 36e5;
+  return h < 0 ? "pre" : h <= LIVE_HOURS ? "live" : "done";
+}
+let livePos = [];
+function renderLive(){
+  const min = +$("l-min").value;
+  const rows = livePos.filter(r => r.trader_count >= min).sort((a, b) => b.trader_count - a.trader_count || b.total_value - a.total_value);
+  $("livecount").hidden = !livePos.length; $("livecount").textContent = livePos.length;
+  $("l-list").innerHTML = rows.length ? rows.slice(0, 60).map(r => {
+    const hrs = (Date.now() - Date.parse(r.start)) / 36e5, since = hrs < 1 ? Math.max(1, Math.round(hrs * 60)) + " min ago" : Math.round(hrs * 10) / 10 + "h ago";
+    return `<div class="lrow"><div><div class="t"><span class="side-tag ${esc(r.outcome)}">${esc(r.outcome).toUpperCase()}</span>${lnk(r, esc(r.title))}</div>
+      <div class="tags"><span class="tag">${esc(r.category)}${r.league ? " · " + esc(r.league) : ""}</span><span class="pill big"><span class="lv" style="background:#fff"></span>Live · started ${since}</span>${spTag(r)}</div></div>
+      <div><span class="lbl">Top traders</span><b>${r.trader_count}</b> <span style="color:var(--mute)">of ${data.trader_pool}</span>${r.sp && r.sp.opp ? `<div style="color:var(--mute);font-size:12px">${r.sp.opp} on the other side</div>` : ""}</div>
+      <div class="cell"><span class="lbl">Price (hourly)</span><b>${cents(r.price)}</b><small>avg buy ${cents(r.avg_entry)}</small></div>
+      <div>${bet(r)}</div></div>`; }).join("")
+    : `<div class="empty">${raw.positions.some(p => p.category === "Sports" && p.start) ? "No live games with top-trader positions right now." : "No game start times in the data yet. Run the Update data job with the new script."}</div>`;
+}
 function renderUs(){
   const u = raw.us, can = !!(u && u.ok && u.matched > 0);
   $("us").innerHTML = `<button class="nav" id="usbtn" aria-pressed="${usOn}" ${can ? "" : "disabled"}>Polymarket US only</button><div class="usnote">${
@@ -873,11 +908,15 @@ function apply(){
   computeSplits(d.positions);
   data = usOn ? {...d, positions: d.positions.filter(p => p.us), recent: (d.recent || []).filter(b => b.us), exits: (d.exits || []).filter(b => b.us)} : d;
   if (hideSplit) data = {...data, positions: data.positions.filter(p => !(p.sp && p.sp.split))};
+  livePos = data.positions.filter(p => phase(p) === "live");
+  const startOf = {}; d.positions.forEach(p => { if (p.start) startOf[p.conditionId] = p.start; });
+  const notLive = b => phase({start: startOf[b.conditionId]}) === "pre";
+  data = {...data, positions: data.positions.filter(p => phase(p) === "pre"), recent: (data.recent || []).filter(notLive), exits: (data.exits || []).filter(notLive)};
   const max = Math.max(1, ...data.positions.map(p => p.trader_count));
   $("min").max = max; $("min").value = Math.min(3, max);
   $("meta").textContent = `Tracking the top ${d.trader_pool} ${file.includes("sports") ? "sports " : ""}earners of the past ${d.period.toLowerCase()} · Updated ${new Date(d.generated_at).toLocaleString()}`;
   renderUs(); renderSplit(); renderCards(); renderSide(); renderChips(); renderLeagues(); render(); renderTraders(); renderFeedFilters(); renderFeed();
-  renderExitFilters(); renderExits(); renderCalFilters(); calDay = null; renderCal(); renderRec(); renderPicks(); renderBets(); renderWatch();
+  renderExitFilters(); renderExits(); renderCalFilters(); calDay = null; renderCal(); renderRec(); renderPicks(); renderBets(); renderWatch(); renderLive();
 }
 
 function load(f){

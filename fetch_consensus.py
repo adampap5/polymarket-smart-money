@@ -430,6 +430,24 @@ def gamma_markets(cids):
     return out
 
 
+def attach_start_times(rows):
+    """Add r["start"] (game start, ISO text) to sports rows, so the page can tell live games from upcoming ones."""
+    sports = sorted({r["conditionId"] for r in rows if r["category"] == "Sports"})
+    starts, n_ok = {}, 0
+    for i in range(0, len(sports), 100):
+        found = gamma_markets(sports[i:i + 100])
+        if found is None:
+            continue
+        for m in found:
+            t = m.get("gameStartTime") or m.get("game_start_time")
+            if t:
+                starts[str(m.get("conditionId", "")).lower()] = str(t).replace(" ", "T").replace("+00", "Z") if "T" not in str(t) or str(t).endswith("+00") else str(t)
+    for r in rows:
+        r["start"] = starts.get(str(r["conditionId"]).lower())
+        n_ok += bool(r["start"])
+    print(f"Game start times: found for {n_ok} of {len(sports)} sports markets")
+
+
 def settle(market, outcome):
     """'won' / 'lost' / 'void' once the market has settled, else None."""
     if not market or not market.get("closed"):
@@ -501,6 +519,7 @@ def main():
     ap.add_argument("--out", default="data.json")
     ap.add_argument("--recent-hours", type=int, default=48)
     ap.add_argument("--watch", default="", help="Polymarket username to watch; writes watch.json")
+    ap.add_argument("--no-start", action="store_true", help="skip looking up game start times")
     ap.add_argument("--no-history", action="store_true")
     ap.add_argument("--no-us", action="store_true", help="skip the Polymarket US market list")
     ap.add_argument("--no-kalshi", action="store_true", help="skip the Kalshi market list")
@@ -597,6 +616,8 @@ def main():
     for r in rows:
         m = kalshi_match(kal_idx, r["title"]) if kal_ok else None
         r["kalshi_url"] = m["url"] if m else None
+    if not args.no_start:
+        attach_start_times(rows)
     rows.sort(key=lambda r: (-r["trader_count"], -r["total_value"]))
     held = {(r["conditionId"], r["outcome"]): r for r in rows}
     for b in recent + exits:
