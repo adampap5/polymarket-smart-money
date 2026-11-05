@@ -173,6 +173,11 @@ th{font-weight:600;color:var(--mute);font-size:12px;background:var(--soft)}th:fi
 .wr2 .mk{min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.wr2 .mk a{color:var(--ink);font-weight:600;text-decoration:none}.wr2 .mk a:hover{text-decoration:underline}
 .wr2 .amt{font-weight:800;text-align:right;white-space:nowrap}.wr2 .amt small{font-weight:500;color:var(--mute);margin-left:4px}
 @media(max-width:820px){.wr2{grid-template-columns:56px 1fr auto}.wr2 .mk{grid-column:1/4;grid-row:2}.wr2 .wb{grid-column:1/4}}
+.evr{display:grid;grid-template-columns:minmax(0,1fr) 84px 84px 118px auto;gap:6px 16px;padding:14px 4px;border-bottom:1px solid var(--line);align-items:center}.evr:last-child{border-bottom:0}
+.evr .cell{display:grid;gap:2px}.evr .cell b{font-size:15px}.evr small{color:var(--mute);font-size:11.5px}
+.pill.strong{background:var(--g3);color:#fff}.pill.warnp{background:var(--warn);color:#6b4a00}
+.evmsg{margin:0 0 12px;padding:10px 14px;border-radius:12px;background:var(--soft);font-size:13px;color:var(--mute)}
+@media(max-width:820px){.evr{grid-template-columns:1fr 1fr 1fr}.evr>:first-child{grid-column:1/4}.evr>:last-child{grid-column:1/4}}
 </style>
 </head>
 <body>
@@ -181,6 +186,7 @@ th{font-weight:600;color:var(--mute);font-size:12px;background:var(--soft)}th:fi
     <div class="brand"><span class="logo"></span>Smart Money</div>
     <button class="nav" id="t-p" aria-selected="true"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m12 3 2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1-4.4-4.3 6.1-.9z"/></svg>Top picks</button>
     <button class="nav" id="t-l" aria-selected="false"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M6.3 6.3a8 8 0 0 0 0 11.4M17.7 6.3a8 8 0 0 1 0 11.4"/></svg>Live games<span class="livedot" id="livecount" hidden></span></button>
+    <button class="nav" id="t-e" aria-selected="false"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 18 10 11l4 4 6-8"/><path d="M15 7h5v5"/></svg>+EV bets</button>
     <button class="nav" id="t-m" aria-selected="false"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h7v7H4zM13 4h7v7h-7zM4 13h7v7H4zM13 13h7v7h-7z"/></svg>Markets</button>
     <button class="nav" id="t-f" aria-selected="false"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2 4 14h7l-1 8 9-12h-7z"/></svg>New bets</button>
     <button class="nav" id="t-x" aria-selected="false"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10 4H5v16h5M15 8l4 4-4 4M19 12H9"/></svg>Exits</button>
@@ -229,6 +235,18 @@ th{font-weight:600;color:var(--mute);font-size:12px;background:var(--soft)}th:fi
         <p class="note"><span class="lv"></span>Games that have <b>already started</b> and haven’t settled. These are kept apart from every other tab, which only show bets on games that haven’t started yet. Top traders’ positions here were often taken before the game began, and prices move fast. This page updates about once an hour, so the price shown can be well out of date. Check the live price before betting.</p>
         <div class="ctl" style="margin-top:0"><label>Minimum traders on a side<select id="l-min"><option value="1">1</option><option value="2" selected>2</option><option value="3">3</option><option value="5">5</option></select></label></div>
         <div id="l-list"></div>
+      </div>
+    </section>
+
+    <section id="ev" hidden>
+      <div class="panel">
+        <p class="note"><b>Plus EV</b> means the price is better than the true chance of winning. Here the “true chance” is the sportsbooks’ line with their margin removed, averaged across books. If the books say a side wins 55% of the time and you can buy it at 50¢, that’s about +5¢ per share on average. <b>After fees</b> subtracts a rough fee estimate. Only NBA and NFL games on the dashboard (markets top traders hold) that match a sportsbook line are listed. Sportsbook odds refresh only a few times a day to stay inside the free plan, so check the line is still there before betting.</p>
+        <div id="ev-msg"></div>
+        <div class="ctl" style="margin-top:0">
+          <label>Minimum edge after fees<select id="ev-min"><option value="0.03" selected>3¢ or more</option><option value="0.06">6¢ or more (strong only)</option><option value="0.0001">Any positive edge</option></select></label>
+          <label>Sportsbooks agreeing<select id="ev-books"><option value="1">1 or more</option><option value="2" selected>2 or more (safer)</option></select></label>
+        </div>
+        <div id="ev-list"></div>
       </div>
     </section>
 
@@ -372,7 +390,7 @@ const pnlPill = x => x == null ? `<span class="pill gray">–</span>` : `<span c
 const niceMax = m => { if (!(m > 0)) return 1; const mag = 10 ** Math.floor(Math.log10(m)); return [1,2,2.5,5,10].map(k => k * mag).find(v => v >= m); };
 let hideSplit = true, data, raw, usOn = false, cat = "All", league = "All", file = "data.json"; const cache = {};
 const SRC = [["data.json","Top overall earners"],["data_sports.json","Top sports earners"]];
-const TITLES = {l: "Live games", p: "Top picks", b: "My bets", m: "Markets", f: "New bets", x: "Exits", c: "Calendar", r: "Track record", t: "Top traders"};
+const TITLES = {e: "+EV bets", l: "Live games", p: "Top picks", b: "My bets", m: "Markets", f: "New bets", x: "Exits", c: "Calendar", r: "Track record", t: "Top traders"};
 
 /* ---------- Kalshi link ---------- */
 const kalUrl = o => o.kalshi_url || "https://www.google.com/search?q=" + encodeURIComponent("site:kalshi.com " + (o.title || ""));
@@ -508,6 +526,7 @@ function bindBets(){
     rd.readAsText(f); e.target.value = ""; });
   ["p-mode", "p-min"].forEach(id => $(id).addEventListener("input", renderPicks));
   $("l-min").addEventListener("input", renderLive);
+  ["ev-min", "ev-books"].forEach(id => $(id).addEventListener("input", renderEv));
 }
 
 /* ---------- Watched user alert ---------- */
@@ -838,7 +857,7 @@ function renderRec(){
     ${catTable}${doneList}${openList}`;
 }
 
-const SECTIONS = {l: "live", p: "picks", b: "bets", m: "markets", f: "feed", x: "exits", c: "cal", r: "rec", t: "traders"};
+const SECTIONS = {e: "ev", l: "live", p: "picks", b: "bets", m: "markets", f: "feed", x: "exits", c: "cal", r: "rec", t: "traders"};
 function show(tab){
   Object.entries(SECTIONS).forEach(([k, id]) => { $(id).hidden = tab !== k; $("t-" + k).setAttribute("aria-selected", tab === k); });
   $("title").textContent = TITLES[tab];
@@ -910,6 +929,27 @@ function renderLive(){
       <div>${bet(r)}</div></div>`; }).join("")
     : `<div class="empty">${raw.positions.some(p => p.category === "Sports" && p.start) ? "No live games with top-trader positions right now." : "No game start times in the data yet. Run the Update data job with the new script."}</div>`;
 }
+let evPos = [];
+const STRONG = 0.06;
+function renderEv(){
+  const o = raw.odds, min = +$("ev-min").value, nb = +$("ev-books").value;
+  let msg = "";
+  if (!o) msg = "No sportsbook data in this update yet. Run the Update data job with the newest script.";
+  else if (!o.ok && /no ODDS_API_KEY/.test(o.reason || "")) msg = "Sportsbook odds aren’t connected yet. Add your Odds API key to the repository secrets (setup steps are in the chat), then run Update data.";
+  else if (!o.ok) msg = "Sportsbook odds problem: " + esc(o.reason || "unknown") + ".";
+  else { const age = o.fetched_at ? (Date.now() / 1000 - o.fetched_at) / 3600 : null;
+    msg = `Sportsbook odds fetched ${age == null ? "—" : age < 1 ? "under an hour" : Math.round(age) + " hours"} ago${o.remaining != null ? ` · ${Math.round(o.remaining)} free credits left this month` : ""}.${age != null && age > 12 ? " These are getting old, so lines may have moved." : ""}`; }
+  $("ev-msg").innerHTML = `<div class="evmsg">${msg}</div>`;
+  const all = evPos.filter(r => r.ev), rows = all.filter(r => r.ev.net >= min && r.ev.books >= nb).sort((a, b) => b.ev.net - a.ev.net);
+  $("ev-list").innerHTML = rows.length ? rows.slice(0, 60).map(r => { const e = r.ev, strong = e.net >= STRONG && e.books >= 2, wild = e.edge > 0.15;
+    return `<div class="evr"><div><div class="t"><span class="side-tag ${esc(r.outcome)}">${esc(r.outcome).toUpperCase()}</span>${lnk(r, esc(r.title))}</div>
+      <div class="tags"><span class="tag">${esc(r.league || "")}</span>${strong ? '<span class="pill strong">Strong</span>' : ""}${wild ? '<span class="pill warnp" title="An edge this big is more often a mismatched line or stale price than a real opportunity">Check the line</span>' : ""}<span class="tag">${e.books} book${e.books > 1 ? "s" : ""} · ${esc(e.game)}</span>${r.trader_count ? `<span class="tag">${r.trader_count} top trader${r.trader_count > 1 ? "s" : ""} hold it</span>` : ""}</div></div>
+      <div class="cell"><small>Market price</small><b>${cents(r.price)}</b></div>
+      <div class="cell"><small>Books say</small><b>${Math.round(e.fair * 1000) / 10}%</b></div>
+      <div class="cell"><small>Edge after fees</small><b class="up">+${Math.round(e.net * 1000) / 10}¢</b><small>${Math.round(e.edge * 1000) / 10}¢ before · fee ~${Math.round(e.fee * 1000) / 10}¢</small></div>
+      <div>${bet(r)}</div></div>`; }).join("")
+    : `<div class="empty">${all.length ? `${all.length} markets matched a sportsbook line, but none have a big enough edge with these settings.` : "No NBA or NFL markets matched a sportsbook line right now."}</div>`;
+}
 function renderUs(){
   const u = raw.us, can = !!(u && u.ok && u.matched > 0);
   $("us").innerHTML = `<button class="nav" id="usbtn" aria-pressed="${usOn}" ${can ? "" : "disabled"}>Polymarket US only</button><div class="usnote">${
@@ -924,6 +964,7 @@ function apply(){
   $("drawer").hidden = true; $("scrim").hidden = true;
   computeSplits(d.positions);
   data = usOn ? {...d, positions: d.positions.filter(p => p.us), recent: (d.recent || []).filter(b => b.us), exits: (d.exits || []).filter(b => b.us)} : d;
+  evPos = data.positions.filter(p => phase(p) === "pre");
   if (hideSplit) data = {...data, positions: data.positions.filter(p => !(p.sp && p.sp.split))};
   livePos = data.positions.filter(p => phase(p) === "live");
   const startOf = {}; d.positions.forEach(p => { if (p.start) startOf[p.conditionId] = p.start; });
@@ -933,7 +974,7 @@ function apply(){
   $("min").max = max; $("min").value = Math.min(3, max);
   $("meta").textContent = `Tracking the top ${d.trader_pool} ${file.includes("sports") ? "sports " : ""}earners of the past ${d.period.toLowerCase()} · Updated ${new Date(d.generated_at).toLocaleString()}`;
   renderUs(); renderSplit(); renderCards(); renderSide(); renderChips(); renderLeagues(); render(); renderTraders(); renderFeedFilters(); renderFeed();
-  renderExitFilters(); renderExits(); renderCalFilters(); calDay = null; renderCal(); renderRec(); renderPicks(); renderBets(); renderWatch(); renderLive();
+  renderExitFilters(); renderExits(); renderCalFilters(); calDay = null; renderCal(); renderRec(); renderPicks(); renderBets(); renderWatch(); renderLive(); renderEv();
 }
 
 function load(f){

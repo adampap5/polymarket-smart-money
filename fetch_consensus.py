@@ -510,6 +510,161 @@ def gamma_markets(cids):
     return out
 
 
+ODDS_SPORTS = {"NBA": "basketball_nba", "NFL": "americanfootball_nfl"}
+ODDS_FILE = "odds.json"
+ODDS_MARKETS = "h2h,spreads,totals"
+
+
+def fetch_odds(rows, every_hours=10.0, min_left=25):
+    """Sportsbook odds from The Odds API (free plan: 500 credits/month). Cached in odds.json and refreshed only every
+    few hours so the free credits last the month. The key comes from the ODDS_API_KEY environment variable (a GitHub secret)."""
+    key = os.environ.get("ODDS_API_KEY", "").strip()
+    try:
+        with open(ODDS_FILE) as f:
+            cache = json.load(f)
+    except Exception:
+        cache = {}
+    if not key:
+        return cache, {"ok": False, "reason": "no ODDS_API_KEY set"}
+    leagues = sorted({r["league"] for r in rows if r.get("category") == "Sports" and r.get("league") in ODDS_SPORTS})
+    age = (time.time() - cache.get("fetched_at", 0)) / 3600
+    if not leagues:
+        return cache, {"ok": True, "reason": "no NBA/NFL markets right now", "remaining": cache.get("remaining")}
+    if age < every_hours and all(ODDS_SPORTS[l] in cache.get("games", {}) for l in leagues):
+        return cache, {"ok": True, "reason": f"using cached odds ({age:.1f}h old)", "remaining": cache.get("remaining")}
+    if cache.get("remaining") is not None and cache["remaining"] < min_left:
+        return cache, {"ok": False, "reason": f"only {cache['remaining']} Odds API credits left this month, not fetching"}
+    games, remaining, last = dict(cache.get("games", {})), cache.get("remaining"), None
+    for lg in leagues:
+        qs = urllib.parse.urlencode({"apiKey": key, "regions": "us", "markets": ODDS_MARKETS, "oddsFormat": "decimal"})
+        url = f"https://api.the-odds-api.com/v4/sports/{ODDS_SPORTS[lg]}/odds?{qs}"
+        try:
+            req = urllib.request.Request(url, headers={"User-Agent": "consensus-dashboard/0.7"})
+            with urllib.request.urlopen(req, timeout=30) as r:
+                games[ODDS_SPORTS[lg]] = json.load(r)
+                left = r.headers.get("x-requests-remaining")
+                remaining = float(left) if left not in (None, "") else remaining
+        except Exception as e:
+            last = f"{lg}: {str(e)[:120]}"
+            print(f"  odds fetch failed for {lg}: {e}")
+    cache = {"fetched_at": int(time.time()), "remaining": remaining, "games": games}
+    with open(ODDS_FILE, "w") as f:
+        json.dump(cache, f)
+    print(f"Odds API: fetched {leagues}, credits left: {remaining}")
+    return cache, {"ok": last is None, "reason": last or "fetched", "remaining": remaining}
+
+
+def _norm(x):
+    return re.sub(r"[^a-z0-9 ]", "", str(x or "").lower()).strip()
+
+
+def _team_is(full, short):
+    full, short = _norm(full), _norm(short)
+    return bool(short) and (full == short or full.endswith(" " + short))
+
+
+def _line_of(row):
+    """Work out which sportsbook market a Polymarket row matches. Returns (kind, team, point, over) or None."""
+    t, o = row["title"] or "", row["outcome"] or ""
+    m = re.match(r"^Spread:\s*(.+?)\s*\(([+-]?\d+(?:\.\d+)?)\)\s*$", t)
+    if m:
+        team, pt = m.group(1), float(m.group(2))
+        if _norm(o) == _norm(team):
+            return "spread", o, pt, None
+        return "spread", o, -pt, None          # the other team gets the opposite line
+    m = re.match(r"^.+?:\s*O/U\s*(\d+(?:\.\d+)?)\s*$", t)
+    if m and _norm(o) in ("over", "under"):
+        return "total", None, float(m.group(1)), _norm(o) == "over"
+    if re.match(r"^.+\s+vs\.?\s+.+$", t) and ":" not in t and _norm(o) not in ("yes", "no", "over", "under"):
+        return "h2h", o, None, None
+    return None
+
+
+def fair_prob(row, games, now=None):
+    """Fair win probability for this row's side from the sportsbooks (margin removed, averaged across books), or None."""
+    spec = _line_of(row)
+    if not spec:
+        return None
+    kind, team, point, over = spec
+    sport = ODDS_SPORTS.get(row.get("league"))
+    events = games.get(sport) or []
+    now = now or time.time()
+    cands = []
+    for ev in events:
+        names = [ev.get("home_team"), ev.get("away_team")]
+        if kind in ("spread", "h2h"):
+            if not any(_team_is(n, team) for n in names):
+                continue
+        else:   # totals: the title names both teams
+            if not all(any(_team_is(n, w) for w in re.split(r"\s+vs\.?\s+|:", row["title"])[:2]) for n in names):
+                continue
+        try:
+            ts = datetime.fromisoformat(ev["commence_time"].replace("Z", "+00:00")).timestamp()
+        except Exception:
+            continue
+        if row.get("start"):
+            try:
+                if abs(ts - datetime.fromisoformat(row["start"].replace("Z", "+00:00")).timestamp()) > 6 * 3600:
+                    continue
+            except Exception:
+                pass
+        cands.append((abs(ts - now), ev))
+    if not cands:
+        return None
+    ev = min(cands, key=lambda c: c[0])[1]
+    probs = []
+    for bk in ev.get("bookmakers", []):
+        mk = next((m for m in bk.get("markets", []) if m.get("key") == {"spread": "spreads", "total": "totals", "h2h": "h2h"}[kind]), None)
+        if not mk:
+            continue
+        outs = mk.get("outcomes", [])
+        mine = other = None
+        for x in outs:
+            nm, pt = x.get("name"), x.get("point")
+            if kind == "total":
+                if _norm(nm) == ("over" if over else "under") and pt == point:
+                    mine = x
+                elif _norm(nm) == ("under" if over else "over") and pt == point:
+                    other = x
+            elif kind == "spread":
+                if _team_is(nm, team) and pt == point:
+                    mine = x
+                elif not _team_is(nm, team) and pt == -point:
+                    other = x
+            else:
+                if _team_is(nm, team):
+                    mine = x
+                else:
+                    other = x
+        if mine and other and mine.get("price") and other.get("price"):
+            a, b = 1 / float(mine["price"]), 1 / float(other["price"])
+            probs.append(a / (a + b))
+    if not probs:
+        return None
+    return {"fair": sum(probs) / len(probs), "books": len(probs), "kind": kind, "spread": round(max(probs) - min(probs), 3),
+            "game": f"{ev.get('away_team')} at {ev.get('home_team')}"}
+
+
+def attach_ev(rows, cache):
+    """Add r["ev"] to NBA/NFL rows that match a sportsbook line: fair price, edge, and an estimated-fee-adjusted edge."""
+    games = cache.get("games", {})
+    age_h = round((time.time() - cache.get("fetched_at", time.time())) / 3600, 1)
+    n = 0
+    for r in rows:
+        r["ev"] = None
+        if r.get("category") != "Sports" or r.get("league") not in ODDS_SPORTS or r.get("price") is None:
+            continue
+        f = fair_prob(r, games)
+        if not f:
+            continue
+        p = float(r["price"])
+        fee = 0.07 * p * (1 - p)        # rough per-share fee (Kalshi's published formula); Polymarket US's fee may differ
+        r["ev"] = {**f, "fair": round(f["fair"], 4), "edge": round(f["fair"] - p, 4), "fee": round(fee, 4),
+                   "net": round(f["fair"] - p - fee, 4), "age_h": age_h}
+        n += 1
+    print(f"+EV: matched {n} of {sum(1 for r in rows if r.get('league') in ODDS_SPORTS)} NBA/NFL markets to sportsbook lines")
+
+
 def attach_start_times(rows):
     """Add r["start"] (game start, ISO text) to sports rows, so the page can tell live games from upcoming ones."""
     sports = sorted({r["conditionId"] for r in rows if r["category"] == "Sports"})
@@ -599,6 +754,8 @@ def main():
     ap.add_argument("--out", default="data.json")
     ap.add_argument("--recent-hours", type=int, default=48)
     ap.add_argument("--watch", default="", help="Polymarket username to watch; writes watch.json")
+    ap.add_argument("--no-odds", action="store_true", help="skip sportsbook odds / +EV")
+    ap.add_argument("--odds-every-hours", type=float, default=10.0, help="minimum hours between Odds API fetches")
     ap.add_argument("--no-start", action="store_true", help="skip looking up game start times")
     ap.add_argument("--no-history", action="store_true")
     ap.add_argument("--no-us", action="store_true", help="skip the Polymarket US market list")
@@ -694,6 +851,9 @@ def main():
         r["kalshi_url"] = m["url"] if m else None
     if not args.no_start:
         attach_start_times(rows)
+    odds_cache, odds_info = ({}, {"ok": False, "reason": "skipped"}) if args.no_odds else fetch_odds(rows, args.odds_every_hours)
+    if not args.no_odds:
+        attach_ev(rows, odds_cache)
     rows.sort(key=lambda r: (-r["trader_count"], -r["total_value"]))
     held = {(r["conditionId"], r["outcome"]): r for r in rows}
     for b in recent + exits:
@@ -722,6 +882,7 @@ def main():
     out = {"generated_at": datetime.now(timezone.utc).isoformat(),
            "trader_pool": len(leaders), "period": args.period, "category": args.category,
            "traders": trader_rows, "positions": rows, "recent": recent[:400], "exits": exits[:400],
+           "odds": {**odds_info, "fetched_at": odds_cache.get("fetched_at")},
            "kalshi": {"ok": bool(kal_ok), "markets": len(kal_markets), "matched": sum(1 for r in rows if r.get("kalshi_url")), "total": len(rows)},
            "us": {"ok": bool(us_ok and us_events), "markets": us_count,
                   "matched": sum(1 for r in rows if r.get("us")), "total": len(rows)}}
