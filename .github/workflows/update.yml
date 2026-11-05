@@ -8,6 +8,8 @@ permissions:
 jobs:
   update:
     runs-on: ubuntu-latest
+    env:
+      ODDS_API_KEY: ${{ secrets.ODDS_API_KEY }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -18,6 +20,6 @@ jobs:
       - run: |
           git config user.name "github-actions"
           git config user.email "actions@github.com"
-          git add data.json data_sports.json history.json calls.json watch.json
+          git add data.json data_sports.json history.json calls.json watch.json odds.json
           git commit -m "Update data" || exit 0
           git push
