@@ -3,7 +3,7 @@
 Usage: python fetch_consensus.py [--top 50] [--period MONTH] [--category OVERALL]
 Standard library only. Uses Polymarket's public Data API (no key needed).
 """
-import argparse, json, os, re, statistics, time, urllib.parse, urllib.request
+import argparse, json, sys, os, re, statistics, time, urllib.parse, urllib.request
 from collections import Counter, defaultdict
 from datetime import datetime, timezone
 
@@ -56,24 +56,104 @@ def classify(title):
     return "Sports" if classify_league(title) else "Other"
 
 
+# Polymarket retired its v1 Data API (it now answers HTTP 410), so everything below talks to v2.
+# v2 uses snake_case field names, wraps rows in {"data": [...], "pagination": {...}} and pages with cursors.
+# get() keeps the old call style and hands back v1-shaped rows (camelCase keys), so the rest of the script is unchanged.
+V2 = {  # old path -> (new path, fixed extra params)
+    "/v1/leaderboard": ("/v2/leaderboard", {}),
+    "/positions": ("/v2/positions", {"status": "OPEN", "filter_type": "TOKENS"}),
+    "/closed-positions": ("/v2/positions", {"status": "CLOSED"}),
+    "/activity": ("/v2/activity", {}),
+}
+_seen_keys = set()
+
+
+def camel(row):
+    """Add camelCase copies of snake_case keys, plus the v1 names the rest of the script expects."""
+    if not isinstance(row, dict):
+        return row
+    out = dict(row)
+    for k, v in row.items():
+        out.setdefault(re.sub(r"_([a-z0-9])", lambda m: m.group(1).upper(), k), v)
+    alias = {  # v1 name: v2 names to try, in order
+        "proxyWallet": ("user_id", "proxy_wallet", "wallet"), "userName": ("user_name", "name", "pseudonym"),
+        "vol": ("volume",), "currentValue": ("current_value",), "curPrice": ("current_price",),
+        "size": ("current_size", "size"), "avgPrice": ("avg_price", "entry_avg_price_usdc"),
+        "initialValue": ("entry_cost_usdc", "initial_value", "total_cost_usdc"), "endDate": ("end_date",),
+        "realizedPnl": ("realized_pnl", "total_pnl"), "usdcSize": ("usdc_size",), "eventSlug": ("event_slug",),
+        "conditionId": ("condition_id",),
+    }
+    for old, news in alias.items():
+        if out.get(old) is None:
+            for n in news:
+                if row.get(n) is not None:
+                    out[old] = row[n]
+                    break
+    if out.get("outcome") is None:
+        out["outcome"] = row.get("outcome_label") or ("Yes" if row.get("outcome_index") == 0 else "No" if row.get("outcome_index") == 1 else None)
+    return out
+
+
 def get(path, **params):
-    url = f"{BASE}{path}?{urllib.parse.urlencode(params)}"
-    req = urllib.request.Request(url, headers={"User-Agent": "consensus-dashboard/0.2"})
-    for attempt in range(3):
-        try:
-            with urllib.request.urlopen(req, timeout=30) as r:
-                return json.load(r)
-        except Exception as e:
-            if attempt == 2:
-                body = ""
+    """Call the Polymarket Data API (v2) using the old v1-style arguments. Returns a list of v1-shaped rows, or [] on failure."""
+    if path not in V2:
+        print(f"  unknown Data API path {path}")
+        return []
+    new_path, extra = V2[path]
+    q = dict(extra)
+    want = int(params.get("limit") or 100)
+    if path == "/v1/leaderboard":
+        if int(params.get("offset") or 0) > 0:
+            return []          # v2 returns the whole board in one call, so there is no second page
+        q.update(time_period=str(params.get("timePeriod", "MONTH")).lower(), category=str(params.get("category", "OVERALL")).lower(),
+                 sort_by="PNL" if params.get("orderBy", "PNL") == "PNL" else "VOLUME")
+    elif path == "/positions":
+        q.update(user=params["user"], filter_amount=params.get("sizeThreshold", 1), sort_by="CURRENT_VALUE", sort_direction="DESC")
+    elif path == "/closed-positions":
+        q.update(user=params["user"], sort_by="TIMESTAMP", sort_direction="DESC")
+    else:
+        q.update(user=params["user"], type=params.get("type", "TRADE"))
+    rows, cursor = [], None
+    for page in range(6):
+        q2 = dict(q, limit=min(1000, max(want - len(rows), 1)))
+        if cursor:
+            q2["cursor"] = cursor
+        url = f"{BASE}{new_path}?{urllib.parse.urlencode(q2)}"
+        req = urllib.request.Request(url, headers={"User-Agent": "consensus-dashboard/0.6"})
+        body = None
+        for attempt in range(3):
+            try:
+                with urllib.request.urlopen(req, timeout=30) as r:
+                    body = json.load(r)
+                break
+            except Exception as e:
+                detail = ""
                 if hasattr(e, "read"):
                     try:
-                        body = e.read().decode()[:300]
+                        detail = e.read().decode()[:300]
                     except Exception:
                         pass
-                print(f"  failed {path}: {e} {body}")
-                return []
-            time.sleep(1.5 * (attempt + 1))
+                if attempt == 2 or getattr(e, "code", 0) in (400, 404, 410):
+                    print(f"  failed {new_path}: {e} {detail}")
+                    return rows
+                wait = 1.5 * (attempt + 1)
+                try:
+                    wait = max(wait, float(e.headers.get("Retry-After", 0)))
+                except Exception:
+                    pass
+                time.sleep(min(wait, 30))
+        data = body.get("data") if isinstance(body, dict) else body
+        if isinstance(data, dict):
+            data = data.get("rows") or data.get("items") or []
+        batch = [camel(x) for x in (data or [])]
+        if batch and new_path not in _seen_keys:        # show the real field names once, so a schema surprise is easy to spot
+            _seen_keys.add(new_path)
+            print(f"  [{new_path}] fields: {sorted(batch[0].keys())[:40]}")
+        rows += batch
+        cursor = ((body.get("pagination") or {}).get("next_cursor")) if isinstance(body, dict) else None
+        if not cursor or len(rows) >= want or not batch:
+            break
+    return rows[:want]
 
 
 def recent_trades(wallet, name, hours, typical, held, entry):
@@ -527,17 +607,13 @@ def main():
     ap.add_argument("--skip-resolve", action="store_true", help="log calls but do not check which have settled")
     args = ap.parse_args()
 
-    leaders = []
-    while len(leaders) < args.top:   # the leaderboard returns at most 50 per request, so page through it
-        chunk = get("/v1/leaderboard", category=args.category, timePeriod=args.period,
-                    orderBy="PNL", limit=min(50, args.top - len(leaders)), offset=len(leaders))
-        if not chunk:
-            break
-        seen = {l.get("proxyWallet") for l in leaders}
-        chunk = [l for l in chunk if l.get("proxyWallet") not in seen]
-        if not chunk:
-            break
-        leaders += chunk
+    leaders = get("/v1/leaderboard", category=args.category, timePeriod=args.period, orderBy="PNL", limit=args.top)
+    leaders = [l for l in leaders if l.get("proxyWallet")]
+    if not leaders:
+        # Never overwrite good data with an empty file: stop here so the dashboard keeps showing the last good update.
+        print("ERROR: the Polymarket leaderboard returned no traders (see any 'failed /v2/leaderboard' line above). "
+              "Leaving the existing data files untouched.")
+        sys.exit(1)
     print(f"Tracking {len(leaders)} traders ({args.category}, {args.period}, by profit)")
 
     groups = defaultdict(lambda: {"traders": [], "value": 0.0, "invested": 0.0, "cost": 0.0, "shares": 0.0})
